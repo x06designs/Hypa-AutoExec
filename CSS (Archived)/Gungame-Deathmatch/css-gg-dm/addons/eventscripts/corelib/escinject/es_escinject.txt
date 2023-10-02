@@ -1,0 +1,303 @@
+// escinject command v0.5
+// Submitted by Wonder
+// Syntax: escinject <command> <var> <string>
+block load
+{
+  es_xexists _tempcore command escinject
+  ifx false(_tempcore) do
+  {
+    es_xregcmd escinject corelib/escinject/escinject "Escapes certain characters dependant on command."
+  }
+  es_xset _ei_a1 0
+  es_xset _ei_a2 0
+  es_xset _ei_a3 0
+
+  // TEST VARS!
+  es_xset _ei_t1 0
+  es_xset _ei_t2 0
+}
+block escinject
+{
+  es_xgetargc _tempcore
+  if (server_var(_tempcore) > 3) do
+  {
+    es_xgetargv _ei_a1 1
+    if (server_var(_ei_a1) == regex) do
+    {
+      es_xgetargv _ei_a2 2
+      es_exists _tempcore variable server_var(_ei_a2)
+      ifx true(_tempcore) do
+      {
+        es_xgetargv _ei_a3 3
+        es_xstring _ei_a3 replace "\" "\\"
+        es_xstring _ei_a3 replace "^" "\^"
+        es_xstring _ei_a3 replace "$" "\$"
+        es_xstring _ei_a3 replace "*" "\*"
+        es_xstring _ei_a3 replace "+" "\+"
+        es_xstring _ei_a3 replace "?" "\?"
+        es_xstring _ei_a3 replace "." "\."
+        es_xstring _ei_a3 replace "|" "\|"
+        es_xstring _ei_a3 replace "[" "\["
+        es_xstring _ei_a3 replace "]" "\]"
+        es_xstring _ei_a3 replace "(" "\("
+        es_xstring _ei_a3 replace ")" "\)"
+        es_xstring _ei_a3 replace "{" "\{"
+        es_xstring _ei_a3 replace "}" "\}"
+        es_copy server_var(_ei_a2) _ei_a3
+      }
+      else do
+      {
+        es_dbgmsg 0 [escinject] The variable server_var(_ei_a2) does not exist!
+      }
+    }
+    else do
+    {
+      if (server_var(_ei_a1) == sql) do
+      {
+        es_xgetargv _ei_a2 2
+        es_exists _tempcore variable server_var(_ei_a2)
+        ifx true(_tempcore) do
+        {
+          es_xgetargv _ei_a3 3
+          es_xstring _ei_a3 replace "'" "''"
+          es_copy server_var(_ei_a2) _ei_a3
+        }
+        else do
+        {
+          es_dbgmsg 0 [escinject] The variable server_var(_ei_a2) does not exist!
+        }
+      }
+      else do
+      {
+        if (server_var(_ei_a1) == url) do
+        {
+          es_xgetargv _ei_a2 2
+          es_exists _tempcore variable server_var(_ei_a2)
+          ifx true(_tempcore) do
+          {
+            es_xgetargv _ei_a3 3
+            es_xstring _ei_a3 replace "%" "%25"
+            es_xstring _ei_a3 replace " " "%20"
+            es_xstring _ei_a3 replace "#" "%23"
+            es_xstring _ei_a3 replace "$" "%24"
+            es_xstring _ei_a3 replace "&" "%26"
+            es_xstring _ei_a3 replace "+" "%2B"
+            es_xstring _ei_a3 replace "," "%2C"
+            es_xstring _ei_a3 replace "/" "%2F"
+            es_xstring _ei_a3 replace ":" "%3A"
+            es_xstring _ei_a3 replace ";" "%3B"
+            es_xstring _ei_a3 replace "<" "%3C"
+            es_xstring _ei_a3 replace "=" "%3D"
+            es_xstring _ei_a3 replace ">" "%3E"
+            es_xstring _ei_a3 replace "?" "%3F"
+            es_xstring _ei_a3 replace "@" "%40"
+            es_xstring _ei_a3 replace "[" "%5B"
+            es_xstring _ei_a3 replace "\" "%5C"
+            es_xstring _ei_a3 replace "]" "%5D"
+            es_xstring _ei_a3 replace "^" "%5E"
+            es_xstring _ei_a3 replace "`" "%60"
+            es_xstring _ei_a3 replace "{" "%7B"
+            es_xstring _ei_a3 replace "|" "%7C"
+            es_xstring _ei_a3 replace "}" "%7D"
+            es_xstring _ei_a3 replace "~" "%7E"
+            es_copy server_var(_ei_a2) _ei_a3
+          }
+          else do
+          {
+            es_dbgmsg 0 [escinject] The variable server_var(_ei_a2) does not exist!
+          }
+        }
+        else do
+        {
+          if (server_var(_ei_a1) == regexb) do
+          {
+            es_xgetargv _ei_a2 2
+            es_exists _tempcore variable server_var(_ei_a2)
+            ifx true(_tempcore) do
+            {
+              es_xgetargv _ei_a3 3
+              es_xstring _ei_a3 replace "\\" "\"
+              es_xstring _ei_a3 replace "\^" "^"
+              es_xstring _ei_a3 replace "\$" "$"
+              es_xstring _ei_a3 replace "\*" "*"
+              es_xstring _ei_a3 replace "\+" "+"
+              es_xstring _ei_a3 replace "\?" "?"
+              es_xstring _ei_a3 replace "\." "."
+              es_xstring _ei_a3 replace "\|" "|"
+              es_xstring _ei_a3 replace "\[" "["
+              es_xstring _ei_a3 replace "\]" "]"
+              es_xstring _ei_a3 replace "\(" "("
+              es_xstring _ei_a3 replace "\)" ")"
+              es_xstring _ei_a3 replace "\{" "{"
+              es_xstring _ei_a3 replace "\}" "}"
+              es_copy server_var(_ei_a2) _ei_a3
+            }
+            else do
+            {
+              es_dbgmsg 0 [escinject] The variable server_var(_ei_a2) does not exist!
+            }
+          }
+          else do
+          {
+            if (server_var(_ei_a1) == sqlb) do
+            { 
+              es_xgetargv _ei_a2 2
+              es_exists _tempcore variable server_var(_ei_a2)
+              ifx true(_tempcore) do
+              {
+                es_xgetargv _ei_a3 3
+                es_xstring _ei_a3 replace "''" "'"
+                es_copy server_var(_ei_a2) _ei_a3
+              }
+              else do
+              {
+                es_dbgmsg 0 [escinject] The variable server_var(_ei_a2) does not exist!
+              }
+            }
+            else do
+            {
+              if (server_var(_ei_a1) == urlb) do
+              {
+                es_xgetargv _ei_a2 2
+                es_exists _tempcore variable server_var(_ei_a2)
+                ifx true(_tempcore) do
+                {
+                  es_xgetargv _ei_a3 3
+                  es_xstring _ei_a3 replace "%25" "%"
+                  es_xstring _ei_a3 replace "%20" " "
+                  es_xstring _ei_a3 replace "%23" "#"
+                  es_xstring _ei_a3 replace "%24" "$"
+                  es_xstring _ei_a3 replace "%26" "&"
+                  es_xstring _ei_a3 replace "%2B" "+"
+                  es_xstring _ei_a3 replace "%2C" ","
+                  es_xstring _ei_a3 replace "%2F" "/"
+                  es_xstring _ei_a3 replace "%3A" ":"
+                  es_xstring _ei_a3 replace "%3B" ";"
+                  es_xstring _ei_a3 replace "%3C" "<"
+                  es_xstring _ei_a3 replace "%3D" "="
+                  es_xstring _ei_a3 replace "%3E" ">"
+                  es_xstring _ei_a3 replace "%3F" "?"
+                  es_xstring _ei_a3 replace "%40" "@"
+                  es_xstring _ei_a3 replace "%5B" "["
+                  es_xstring _ei_a3 replace "%5C" "\"
+                  es_xstring _ei_a3 replace "%5D" "]"
+                  es_xstring _ei_a3 replace "%5E" "^"
+                  es_xstring _ei_a3 replace "%60" "`"
+                  es_xstring _ei_a3 replace "%7B" "{"
+                  es_xstring _ei_a3 replace "%7C" "|"
+                  es_xstring _ei_a3 replace "%7D" "}"
+                  es_xstring _ei_a3 replace "%7E" "~"
+                  es_copy server_var(_ei_a2) _ei_a3
+                }
+                else do
+                {
+                  es_dbgmsg 0 [escinject] The variable server_var(_ei_a2) does not exist!
+                }
+              }
+              else do
+              {
+                es_dbgmsg 0 [escinject] server_var(_ei_a1) is an invalid command.
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 [escinject] Syntax: escinject <command> <var> <string>
+  }
+}
+block escinjecttest
+{
+  es_xset _ei_t1 "\^$*+?.|[](){}"
+
+  profile begin escinject_regex
+  es escinject regex _ei_t2 server_var(_ei_t1)
+  profile end escinject_regex
+
+  if (server_var(_ei_t2) == "\\\^\$\*\+\?\.\|\[\]\(\)\{\}") do
+  {
+    echo escinject regex was successful!
+  }
+  else do
+  {
+    echo escinject regex was NOT successful!
+  }
+
+  es_xset _ei_t1 "'"
+
+  profile begin escinject_sql
+  es escinject sql _ei_t2 server_var(_ei_t1)
+  profile end escinject_sql
+
+  if (server_var(_ei_t2) == "''") do
+  {
+    echo escinject sql was successful!
+  }
+  else do
+  {
+    echo escinject sql was unsuccessful!
+  }
+
+  es_xset _ei_t1 "% #$&+,/:;<=>?@[\]^`{|}~"
+
+  profile begin escinject_url
+  es escinject url _ei_t2 server_var(_ei_t1)
+  profile end escinject_url
+
+  if (server_var(_ei_t2) == "%25%20%23%24%26%2B%2C%2F%3A%3B%3C%3D%3E%3F%40%5B%5C%5D%5E%60%7B%7C%7D%7E") do
+  {
+    echo escinject url was successful!
+  }
+  else do
+  {
+    echo escinject url was unsuccessful!
+  }
+
+  es_xset _ei_t1 "\\\^\$\*\+\?\.\|\[\]\(\)\{\}"
+
+  profile begin escinject_regexb
+  es escinject regexb _ei_t2 server_var(_ei_t1)
+  profile end escinject_regexb
+
+  if (server_var(_ei_t2) == "\^$*+?.|[](){}") do
+  {
+    echo escinject regexb was successful!
+  }
+  else do
+  {
+    echo escinject regexb was NOT successful!
+  }
+
+  es_xset _ei_t1 "''"
+
+  profile begin escinject_sqlb
+  es escinject sqlb _ei_t2 server_var(_ei_t1)
+  profile end escinject_sqlb
+
+  if (server_var(_ei_t2) == "'") do
+  {
+    echo escinject sqlb was successful!
+  }
+  else do
+  {
+    echo escinject sqlb was unsuccessful!
+  }
+
+  es_xset _ei_t1 "%25%20%23%24%26%2B%2C%2F%3A%3B%3C%3D%3E%3F%40%5B%5C%5D%5E%60%7B%7C%7D%7E"
+
+  profile begin escinject_urlb
+  es escinject urlb _ei_t2 server_var(_ei_t1)
+  profile end escinject_urlb
+
+  if (server_var(_ei_t2) == "% #$&+,/:;<=>?@[\]^`{|}~") do
+  {
+    echo escinject urlb was successful!
+  }
+  else do
+  {
+    echo escinject urlb was unsuccessful!
+  }
+}

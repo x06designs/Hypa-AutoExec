@@ -1,0 +1,124 @@
+// EntityLib v0.2
+
+block load
+{
+  es_xset _exists 0
+  
+  es_xexists _exists command setentname
+  ifx false(_exists) do
+  {
+    es_regcmd setentname "corelib/entitylib/setentname" "Sets an entity name"
+    // TODO: Needs "live" test cases for setentname
+    //testcase qcreate corelib whiletest "Tests while"
+    //testcase addtest whiletest whiletest1 corelib/while_test "Test else cases"
+    // begin setentname's variables
+    es_xset rawr 0
+    es_xset entnameobj 0
+    es_xset entnamename 0
+    es_xset objorigin 0
+    es_xset oldmovetype 0
+    es_xset playerorigin 0
+    es_xset el_eyes1 0
+    es_xset el_eyes2 0
+    es_xset el_eyes3 0
+    es_xset forwardvector 0
+    es_xset eyeoffsetx 0
+    es_xset eyeoffsety 0
+    es_xset eyeoffsetz 0
+    es_xset eyeoffset 0
+    es_xset eyeorigin 0
+    es_xset eyeline 0
+    es_xset eyepoint 0
+    es_xset eyepointdiff 0
+    es_xset el_neworigin 0
+    es_xset el_plx 0
+    es_xset el_ply 0
+    es_xset el_plz 0
+    es_xset _entitylib_game 0
+    es_getgame _entitylib_game
+  }
+  
+  // more commands here
+}
+
+
+// Special thanks to Einlanzers who provided a lot of
+//   research for this script.
+// setentname
+// setentname <entity-index#> <desired-name>
+// This command allows you to set an entities name
+//   to whatever you want. It is supposed to be a lot
+//   like the EST command "est_setentname", but this version
+//   is a bit buggier because it requires a player to be present
+//   in order to work. Better implementations are *very* welcome,
+//   but this has been very difficult to get this far.
+block setentname
+{
+  // get a userid
+  es_getuserid rawr
+  // get the index #
+  es_getargv entnameobj 1
+  // get the name
+  es_getargv entnamename 2
+  // get object origin = objorigin
+  es_getindexprop objorigin server_var(entnameobj) "CBaseEntity.m_vecOrigin"
+  es_getindexprop oldmovetype server_var(entnameobj) "CBaseEntity.movetype"
+  // get player origin
+  es_getplayerprop playerorigin server_var(rawr) "CBaseEntity.m_vecOrigin"
+  // get player eyeangles
+  if (server_var(_entitylib_game) == "Counter-Strike: Source") do
+  {
+    es_getplayerprop el_eyes1 server_var(rawr) "CCSPlayer.m_angEyeAngles[0]"
+    es_getplayerprop el_eyes2 server_var(rawr) "CCSPlayer.m_angEyeAngles[1]"
+    es_getplayerprop eyeoffsetx server_var(rawr) "CBasePlayer.localdata.m_vecViewOffset[0]"
+    es_getplayerprop eyeoffsety server_var(rawr) "CBasePlayer.localdata.m_vecViewOffset[1]"
+    es_getplayerprop eyeoffsetz server_var(rawr) "CBasePlayer.localdata.m_vecViewOffset[2]"
+
+  }
+  if ("Day of Defeat" in server_var(_entitylib_game)) do
+  {
+    es_getplayerprop el_eyes1 server_var(rawr) "CDODPlayer.m_angEyeAngles[0]"
+    es_getplayerprop el_eyes2 server_var(rawr) "CDODPlayer.m_angEyeAngles[1]"
+    es_getplayerprop eyeoffsetx server_var(rawr) "CBasePlayer.localdata.m_vecViewOffset[0]"
+    es_getplayerprop eyeoffsety server_var(rawr) "CBasePlayer.localdata.m_vecViewOffset[1]"
+    es_getplayerprop eyeoffsetz server_var(rawr) "CBasePlayer.localdata.m_vecViewOffset[2]"
+  }
+  if ("Deathmatch" in server_var(_entitylib_game)) do
+  {
+    es_getplayerprop el_eyes1 server_var(rawr) "CHL2MP_Player.m_angEyeAngles[0]"
+    es_getplayerprop el_eyes2 server_var(rawr) "CHL2MP_Player.m_angEyeAngles[1]"
+    es_getplayerprop eyeoffsetx server_var(rawr) "CHL2MP_Player.baseclass.baseclass.baseclass.baseclass.m_vecViewOffset[0]"
+    es_getplayerprop eyeoffsety server_var(rawr) "CHL2MP_Player.baseclass.baseclass.baseclass.baseclass.m_vecViewOffset[1]"
+    es_getplayerprop eyeoffsetz server_var(rawr) "CHL2MP_Player.baseclass.baseclass.baseclass.baseclass.m_vecViewOffset[2]"
+  }
+  // get forward vector from angle forwardvector
+  es_createvectorstring forwardvector server_var(el_eyes1) server_var(el_eyes2) server_var(el_eyes3)
+  es vecmath forwardvector "1.0,1.0,1.0" angles server_var(forwardvector)
+  // get player eyeoffset
+  es_createvectorstring eyeoffset server_var(eyeoffsetx) server_var(eyeoffsety) server_var(eyeoffsetz)
+  // add eyeoffset to origin = eyeorigin
+  es vecmath eyeorigin server_var(playerorigin) + server_var(eyeoffset)
+  // get 0.5 scalar * forward vector = eyeline
+  es vecmath eyeline server_var(forwardvector) * "0.5"
+  // add eyeorigin + eyeline = eyepoint
+  es vecmath eyepoint server_var(eyeorigin) + server_var(eyeline)
+  // get vector from eyepoint to player origin = eyepointdiff
+  es_createvectorfrompoints eyepointdiff server_var(eyepoint) server_var(playerorigin)
+  // get objorigin + eyepointdiff vector = el_neworigin
+  es vecmath el_neworigin server_var(objorigin) + server_var(eyepointdiff)
+  // teleport player to el_neworigin
+  es_splitvectorstring el_plx el_ply el_plz server_var(el_neworigin)
+  es_setpos server_var(rawr) server_var(el_plx) server_var(el_ply) server_var(el_plz)
+  // set the player's view to the object
+  es_splitvectorstring el_plx el_ply el_plz server_var(objorigin)
+  es playerset viewcoord server_var(rawr) server_var(el_plx) server_var(el_ply) server_var(el_plz)
+  // ent_setname to rename the object he's looking at
+  es_entsetname server_var(rawr) server_var(entnamename)
+
+  // move the player back
+  es_splitvectorstring el_plx el_ply el_plz server_var(playerorigin)
+  es_setpos server_var(rawr) server_var(el_plx) server_var(el_ply) server_var(el_plz)
+  // fix his/her eyes!
+  es_setang server_var(rawr) server_var(el_eyes1) server_var(el_eyes2)
+  // done! Maybe they didn't notice they were a tool. 
+}

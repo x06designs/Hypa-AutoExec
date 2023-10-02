@@ -1,0 +1,310 @@
+// Popup EventScripts library, Help subscript
+//  Script author: GODJonez
+// See http://www.eventscripts.com/pages/Popup for more information
+
+block help_usage_popup
+{
+  es_xdbgmsg 0 "popup" - "Create and manage menus and popups that are displayed to players"
+  es_dbgmsg 0 Popup version: server_var(popup_version)
+  es_xdbgmsg 0 Usage:
+  es_xdbgmsg 0  popup <command> <name> [<parameters>]
+  es_xdbgmsg 0 Available popup commands:
+  es_xdbgmsg 0  create delete exists
+  es_xdbgmsg 0  addline addlinef delline modline modlinef insline inslinef
+  es_xdbgmsg 0  prepuser menuselect menuselectfb select submenu menuvalue
+  es_xdbgmsg 0  timeout isqueued active
+  es_xdbgmsg 0  send unsendname close
+  es_xdbgmsg 0  cachemode recache update displaymode
+  es_xdbgmsg 0  construct easymenu addoption setoption setvar getvar
+  es_xdbgmsg 0  description emulate
+  es_xdbgmsg 0 You can get the syntax of individual items by using the command without other parameters.
+}
+
+block help_usage_create
+{
+  es_xdbgmsg 0 popup create <name>
+  es_xdbgmsg 0  - Creates a new popup with the specified name
+  es_xdbgmsg 0  - Deletes existing popups with the same name
+  es_xdbgmsg 0  - Usage of other commands require that the popup has been created with this command
+}
+
+block help_usage_delete
+{
+  es_xdbgmsg 0 popup delete <name>
+  es_xdbgmsg 0  - Deletes the named popup from server memory
+  es_xdbgmsg 0  - Does not remove the popup from users if already sent to them
+}
+
+block help_usage_exists
+{
+  es_xdbgmsg 0 popup exists <name> <variable>
+  es_xdbgmsg 0  - Checks the existance of the named popup
+  es_xdbgmsg 0  - Sets the variable to 1 if the popup is created, otherwise 0
+}
+
+block help_usage_addline
+{
+  es_xdbgmsg 0 popup addline <name> <text>
+  es_xdbgmsg 0  - Adds a line of text at the end of the popup
+  es_xdbgmsg 0  - Usage of quotes around the text is heavily recommended
+}
+
+block help_usage_addlinef
+{
+  es_xdbgmsg 0 popup addlinef <name> <format> [<token1> <token2> ... <token9>]
+  es_xdbgmsg 0  - Adds a line of text at the end of the popup
+  es_xdbgmsg 0  - See the help for "es_formatv" for explanation of how format and tokens are used
+}
+
+block help_usage_delline
+{
+  es_xdbgmsg 0 popup delline <name> <line>
+  es_xdbgmsg 0  - Deletes selected line (line number as parameter) from the popup
+  es_xdbgmsg 0  - If removed from the middle, all subsequent lines are moved upwards to fill in the space
+}
+
+block help_usage_modline
+{
+  es_xdbgmsg 0 popup modline <name> <line> <text>
+  es_xdbgmsg 0  - Replaces an existing line with a new text
+  es_xdbgmsg 0  - Usage of quotes around the text is heavily recommended
+}
+
+block help_usage_modlinef
+{
+  es_xdbgmsg 0 popup modlinef <name> <line> <format> [<token1> <token2> ... <token9>]
+  es_xdbgmsg 0  - Replaces an existing line with a new text
+  es_xdbgmsg 0  - See the help for "es_formatv" for explanation of how format and tokens are used
+}
+
+block help_usage_insline
+{
+  es_xdbgmsg 0 popup insline <name> <line> <text>
+  es_xdbgmsg 0  - Inserts a line of text to the specified position
+  es_xdbgmsg 0  - All subsequnet lines are moved downwards to make up space
+  es_xdbgmsg 0  - Usage of quotes around the text is heavily recommended
+}
+
+block help_usage_inslinef
+{
+  es_xdbgmsg 0 popup inslinef <name> <line> <format> [<token1> <token2> ... <token9>]
+  es_xdbgmsg 0  - Inserts a line of text to the specified position
+  es_xdbgmsg 0  - All subsequnet lines are moved downwards to make up space
+  es_xdbgmsg 0  - See the help for "es_formatv" for explanation of how format and tokens are used
+}
+
+block help_usage_prepuser
+{
+  es_xdbgmsg 0 popup prepuser <name> <block>
+  es_xdbgmsg 0  - Defines a block to be executed just before the popup is displayed to a player
+  es_xdbgmsg 0  - Useful to prepare the popup to display up-to-date information
+  es_xdbgmsg 0  - Usage of different cachemode and recache would be preferred when possible
+  es_xdbgmsg 0  - Setting the block to "0" will disable this feature
+  es_xdbgmsg 0  - Only one prepuser block can be assigned for a single popup
+}
+
+block help_usage_menuselect
+{
+  es_xdbgmsg 0 popup menuselect <name> <block>
+  es_xdbgmsg 0  - Defines a block to be executed whenever a player selects a menu item
+  es_xdbgmsg 0  - The block is executed even if other actions were defined for the menu item
+  es_xdbgmsg 0  - Setting the block to "0" will disable this feature
+  es_xdbgmsg 0  - Only one menuselect block can be assigned for a single popup
+}
+
+block help_usage_menuselectfb
+{
+  es_xdbgmsg 0 popup menuselectfb <name> <block>
+  es_xdbgmsg 0  - Defines a block to be executed whenever a player selects a menu item
+  es_xdbgmsg 0  - The block is only executed if no other actions were defined for the menu item
+  es_xdbgmsg 0  - Setting the block to "0" will disable this feature
+  es_xdbgmsg 0  - Only one menuselectfb block can be assigned for a single popup
+}
+
+block help_usage_select
+{
+  es_xdbgmsg 0 popup select <name> <item> <block>
+  es_xdbgmsg 0  - Defines a block to be executed whenever a player selects the specific menu item
+  es_xdbgmsg 0  - When defined, menuselectfb will not be executed for the menu item
+  es_xdbgmsg 0  - Setting the block to "0" will disable this feature
+  es_xdbgmsg 0  - Only one select block can be assigned for a single menu item in a popup
+}
+
+block help_usage_submenu
+{
+  es_xdbgmsg 0 popup submenu <name> <item> <popup>
+  es_xdbgmsg 0  - Defines a popup to be displayed whenever a player selects the specific menu item
+  es_xdbgmsg 0  - Has no effect on the functionality of menuselectfb
+  es_xdbgmsg 0  - Setting the popup to "0" will disable this feature
+  es_xdbgmsg 0  - Only one submenu can be assigned for a single menu item in a popup
+}
+
+block help_usage_menuvalue
+{
+  es_xdbgmsg 0 popup menuvalue <name> <variable> <item> <value>
+  es_xdbgmsg 0  - Sets the variable to chosen value when a player chooses the specific menu item
+  es_xdbgmsg 0  - Setting the variable to "0" will disable this feature
+  es_xdbgmsg 0  - Only one variable can be assigned for a single menu item in a popup
+}
+
+block help_usage_timeout
+{
+  es_xdbgmsg 0 popup timeout <name> <mode> <time>
+  es_xdbgmsg 0  - Sets a timeout after which the popup is removed from the player
+  es_xdbgmsg 0  - Mode can be either "send" or "view", see documentation for info
+  es_xdbgmsg 0  - Time is measured in seconds, float type values can be used
+}
+
+block help_usage_send
+{
+  es_xdbgmsg 0 popup send <name> <user>
+  es_xdbgmsg 0  - Adds the popup to popup queue of the specified player(s)
+  es_xdbgmsg 0  - When used in player-initiated events, the popup is forced to display
+  es_xdbgmsg 0  - All the popup properties must be set before using this command
+  es_xdbgmsg 0  - For all valid values for <user>, see the documentation
+}
+
+block help_usage_unsend
+{
+  es_xdbgmsg 0 popup unsend <sendmode id> <user>
+  es_xdbgmsg 0  - Removes a popup from player's popup queue
+  es_xdbgmsg 0  - This command is not for public use
+  es_xdbgmsg 0  - For all valid values for <user>, see the documentation
+}
+
+block help_usage_unsendid
+{
+  es_xdbgmsg 0 popup unsendid <viewmode id> <user>
+  es_xdbgmsg 0  - Removes a popup from player's popup queue
+  es_xdbgmsg 0  - This command is not for public use
+  es_xdbgmsg 0  - For all valid values for <user>, see the documentation
+}
+
+block help_usage_unsendname
+{
+  es_xdbgmsg 0 popup unsendname <name> <user>
+  es_xdbgmsg 0  - Removes a popup from player's popup queue
+  es_xdbgmsg 0  - If the popup is currently active, menu item 0 is selected
+  es_xdbgmsg 0  - For all valid values for <user>, see the documentation
+}
+
+block help_usage_close
+{
+  es_xdbgmsg 0 popup close <name> <user>
+  es_xdbgmsg 0  - Removes a popup from player's popup queue
+  es_xdbgmsg 0  - If the popup is currently active, menu item 0 is not selected
+  es_xdbgmsg 0  - For all valid values for <user>, see the documentation
+}
+
+block help_usage_isqueued
+{
+  es_xdbgmsg 0 popup isqueued <name> <variable> <userid>
+  es_xdbgmsg 0  - Checks the popup queue of the user
+  es_xdbgmsg 0  - The position of the first named popup found in the queue is saved in the variable
+  es_xdbgmsg 0  - If the popup is not in the queue, the value set is "0"
+}
+
+block help_usage_active
+{
+  es_xdbgmsg 0 popup active <variable name> <variable count> <userid>
+  es_xdbgmsg 0  - Checks the popup queue of the user
+  es_xdbgmsg 0  - The active popup name is stored in the <variable name> variable
+  es_xdbgmsg 0  - The count of popups in the queue is stored in the <variable count> variable
+  es_xdbgmsg 0  - If the queue is empty, both variables are set to "0"
+}
+
+block help_usage_cachemode
+{
+  es_xdbgmsg 0 popup cachemode <name> <mode>
+  es_xdbgmsg 0  - Sets the cachemode of the popup
+  es_xdbgmsg 0  - The available modes are: "static", "global", "user", "eval"
+  es_xdbgmsg 0  - See the documentation for details
+}
+
+block help_usage_recache
+{
+  es_xdbgmsg 0 popup recache <name> [<user>]
+  es_xdbgmsg 0  - Forces recaching of the popup
+  es_xdbgmsg 0  - See the documentation for details
+}
+
+block help_usage_update
+{
+  es_xdbgmsg 0 popup update <name> <user>
+  es_xdbgmsg 0  - Refreshes the popup if active on the player(s) 
+  es_xdbgmsg 0  - For all valid values for <user>, see the documentation
+}
+
+block help_usage_displaymode
+{
+  es_xdbgmsg 0 popup displaymode <name> <mode>
+  es_xdbgmsg 0  - Sets the displaymode of the popup
+  es_xdbgmsg 0  - The available modes are: "normal", "sticky"
+  es_xdbgmsg 0  - See the documentation for details
+}
+
+block help_usage_construct
+{
+  es_xdbgmsg 0 popup construct <name> <list> <flags>
+  es_xdbgmsg 0  - Creates a new popup using a specific template by <list>
+  es_xdbgmsg 0  - The available lists are: "players", "scripts", "weapons"
+  es_xdbgmsg 0  - See the documentation for more information
+}
+
+block help_usage_setvar
+{
+  es_xdbgmsg 0 popup setvar <name> <popup var> <value>
+  es_xdbgmsg 0  - Sets a value of internal popup variable
+  es_xdbgmsg 0  - See the documentation for details
+}
+
+block help_usage_getvar
+{
+  es_xdbgmsg 0 popup setvar <name> <local var> <popup var>
+  es_xdbgmsg 0  - Gets a value of internal popup variable and sets to local variable
+  es_xdbgmsg 0  - See the documentation for details
+}
+
+block help_usage_easymenu
+{
+  es_xdbgmsg 0 popup easymenu <name> <variable> <block>
+  es_xdbgmsg 0  - Creates a new popup with special properties
+  es_xdbgmsg 0  - The <variable> will hold the menu item chosen
+  es_xdbgmsg 0  - The <block> is the block executed when player chooses a menu item
+  es_xdbgmsg 0  - Use addoption and setoption to create easymenu content
+}
+
+block help_usage_addoption
+{
+  es_xdbgmsg 0 popup addoption <name> <item> <text> [<state>]
+  es_xdbgmsg 0  - Adds an option to "easymenu" type popup
+  es_xdbgmsg 0  - The <item> is the value which is set to the <variable> when this item is chosen
+  es_xdbgmsg 0  - The <text> is what is shown in the menu
+  es_xdbgmsg 0  - The <state> can be either "0" or "1", which correspond to disabled and enabled respectively
+}
+
+block help_usage_setoption
+{
+  es_xdbgmsg 0 popup setoption <name> <item> [<text>] [<state>]
+  es_xdbgmsg 0  - Modifies an option in "easymenu" type popup
+  es_xdbgmsg 0  - The <item> is the previously added item
+  es_xdbgmsg 0  - The <text> is what is shown in the menu
+  es_xdbgmsg 0  - The <state> can be either "-1", "0" or "1", "-1" leaving it as it was
+}
+
+block help_usage_description
+{
+  es_xdbgmsg 0 popup description <name> <text>
+  es_xdbgmsg 0  - Creates a description for popups
+  es_xdbgmsg 0  - Used with construct and easymenu popups
+  es_xdbgmsg 0  - The <text> is what is shown below title but before the options
+}
+
+block help_usage_emulate
+{
+  es_xdbgmsg 0 popup emulate <name> <item> <user>
+  es_xdbgmsg 0  - Emulates a popup choice for named popup by named user
+  es_xdbgmsg 0  - The <item> is the menu choice to be made
+  es_xdbgmsg 0  - The <user> is user identifier, flags and filterblocks are usable
+  es_xdbgmsg 0  - As a special case, setting <user> to "debug" enables popup handling debug
+}

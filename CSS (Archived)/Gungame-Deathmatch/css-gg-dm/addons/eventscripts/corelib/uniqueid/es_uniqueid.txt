@@ -1,0 +1,87 @@
+// uniqueid command v0.2.1
+// Submitted by [NATO]Hunter
+// Syntax: uniqueid <var> <player> [add botname]
+block load
+{
+  es_xdoblock corelib/uniqueid/uniqueid_register
+}
+
+block uniqueid_register
+{
+  // variables used by uniqueid
+  es_xset _uniqueid_var 0
+  es_xset _uniqueid_forcebot 0
+  es_xset _uniqueid_userid 0
+  es_xset _uniqueid_steamid 0
+  es_xset _uniqueid_ip 0
+  es_xset _uniqueid_string 0
+  es_xset _uniqueid_isbot 0
+  es_xset _uniqueid_name 0
+  // check to see if uniqueid exists
+  es_xexists _exists command uniqueid
+  if (server_var(_exists) = 0) do
+  {
+    es_xregcmd uniqueid corelib/uniqueid/uniqueid "Generates a unique id based on the ip for LAN servers or returns the SteamID for Internet servers"
+  }
+}
+
+block uniqueid
+{
+  es_xgetargv _uniqueid_var 1
+  ifx true(_uniqueid_var) do
+  {
+    es_xgetargv _uniqueid_userid 2
+    ifx true(_uniqueid_userid) do
+    {
+      es_getuserid _uniqueid_userid server_var(_uniqueid_userid)
+      ifx true(_uniqueid_userid) do
+      {
+        es_isbot _uniqueid_isbot server_var(_uniqueid_userid)
+        ifx false(_uniqueid_isbot) do
+        {
+          ifx false(sv_lan) do
+          {
+            es_getplayersteamid _uniqueid_steamid server_var(_uniqueid_userid)
+            es_set server_var(_uniqueid_var) server_var(_uniqueid_steamid)
+          }
+          else do
+          {
+            es getplayerinfo _uniqueid_ip server_var(_uniqueid_userid) "address"
+            es_token _uniqueid_ip server_var(_uniqueid_ip) 1 ":"
+            es_strlen _uniqueid_strlen server_var(_uniqueid_ip)
+            es_string _uniqueid_ip replace "."
+            es_xformatv _uniqueid_string "LAN_%1:%2" _uniqueid_strlen _uniqueid_ip
+            es_set server_var(_uniqueid_var) server_var(_uniqueid_string)
+          }
+        }
+        else do
+        {
+          es_xgetargv _uniqueid_forcebot 3
+          ifx true(_uniqueid_forcebot) do
+          {
+            es getbotname _uniqueid_name server_var(_uniqueid_userid)
+            es forcecase _uniqueid_name "upper"
+            es_xformatv _uniqueid_string "BOT_%1" _uniqueid_name
+            es_set server_var(_uniqueid_var) server_var(_uniqueid_string)
+          }
+          else do
+          {
+            es_set server_var(_uniqueid_var) "BOT"
+          }
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 uniqueid: Invalid player for uniqueid. Syntax: uniqueid <var> <player> [add botname]
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 uniqueid: Invalid arguments for uniqueid. Syntax: uniqueid <var> <player> [add botname]
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 uniqueid: Invalid arguments for uniqueid. Syntax: uniqueid <var> <player> [add botname]
+  }
+}

@@ -1,0 +1,51 @@
+// simple vote test script for vote command v0.4.4
+//
+block load
+{
+  vote create funnyvote "vote/votetest/funnyvote" "vote/votetest/funnyvote_submit"
+  vote setquestion funnyvote "Is this a funny vote?"
+  vote addanswer funnyvote "Yes"
+  vote addanswer funnyvote "No"
+  vote remanswer funnyvote 1
+  vote setanswer funnyvote 1 "Yes!"
+  vote start funnyvote 120
+}
+
+block unload
+{
+  vote stop funnyvote
+  vote delete funnyvote
+}
+
+block funnyvote_submit
+{
+  // results:
+  // _vote_name     = Name of the vote
+  // _vote_id       = ID of the submitted answer
+  // _vote_text     = Text of the submitted answer
+  // _vote_userid   = UserID that submitted the answer
+  es_getplayername _tempcore server_var(_vote_userid)
+  es_msg #multi #lightgreen server_var(_tempcore) has voted server_var(_vote_text) #green[#lightgreen server_var(_vote_id) #green]!
+}
+
+block funnyvote
+{
+  // results:
+  // _vote_name     = Name of the vote
+  // _vote_id       = ID of the winning answer
+  // _vote_text     = Text of the winning answer
+  // _vote_count    = Votes of the winning answer
+  // _vote_percent  = Percentage of the winning answer
+  // _vote_votes    = Total votes
+  // _vote_tie      = 1 if there would be two or more winning answers and 0 if there is only one winning answer
+  // _vote_canceled = 1 if the vote was canceled and 0 if it was normaly stopped
+  es_msg #multi #greenAnswer#lightgreen server_var(_vote_text) #green[#lightgreen server_var(_vote_id) #green] has won with#lightgreen server_var(_vote_count) #greenof#lightgreen server_var(_vote_votes) #greenvotes [#lightgreen server_var(_vote_percent) %#green]!
+  ifx true(_vote_tie) do
+  {
+    es_xmsg #green The vote was tied!
+  }
+  ifx true(_vote_cancel) do
+  {
+    es_xmsg #green The vote was canceled!
+  }
+}

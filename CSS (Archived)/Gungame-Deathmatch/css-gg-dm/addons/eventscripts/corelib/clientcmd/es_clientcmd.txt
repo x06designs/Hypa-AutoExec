@@ -1,0 +1,182 @@
+
+block load
+{
+  es_xset _exists 0
+  es_xset _cc1 0
+  es_xset _cc2 0
+  es_xset _cc3 0  
+  es_xset _cc_name 0
+  es_xset _cc_default 0
+  es_xset _cc_perm 0
+  es_xset _cc_block 0
+  es_xset myvar 0
+  // check to see if while exists
+  es_xexists _exists command clientcmd
+  ifx false(_exists) do
+  {
+      es_xregcmd clientcmd corelib/clientcmd/manager "Allows you to loop with a condition and a block."
+  
+      keygroupremove _clientcmd
+      es_xkeygroupcreate _clientcmd_say
+      es_xkeygroupcreate _clientcmd_console      
+      es_xkeygroupcreate _clientcmd
+      es_xkeycreate _clientcmd __default-map
+      es_keysetvalue _clientcmd __default-map "#admin" server_var(AUTHSERVICE_ADMIN) 
+      es_keysetvalue _clientcmd __default-map "#all" server_var(AUTHSERVICE_UNRESTRICTED)
+      es_keysetvalue _clientcmd __default-map "#known" server_var(AUTHSERVICE_IDENTIFIED)
+      es_keysetvalue _clientcmd __default-map "#root" server_var(AUTHSERVICE_ROOT)
+      es_keysetvalue _clientcmd __default-map "#poweruser" server_var(AUTHSERVICE_POWERUSER)
+    
+    //testcase qcreate corelib clientcmdtest "Tests clientcmd"
+    //testcase addtest whiletest whiletest1 corelib/while_test "Test else cases"
+  } 
+}
+
+
+// clientcmd create say my_command "myscript/myblock" "some_permission" #admin
+// clientcmd create console my_command "myscript/myblock" "some_permission" #admin
+// clientcmd delete say my_command
+// clientcmd delete console my_command
+
+block manager
+{
+  es_xgetargv _cc1 1
+  es_xgetargv _cc2 2
+  es_xgetargv _cc_name 3
+  es_xformatv _cc1 "corelib/clientcmd/%2_%1" _cc1 _cc2
+  es_doblock server_var(_cc1)
+}
+
+block say_create
+{
+  es_xgetargv _cc_block 4
+  es_xgetargv _cc_perm 5
+  es_xgetargv _cc_default 6
+  es_keycreate _clientcmd_say server_var(_cc_name)
+  es_keysetvalue _clientcmd_say server_var(_cc_name) block server_var(_cc_block)
+  es_keysetvalue _clientcmd_say server_var(_cc_name) perm server_var(_cc_perm)
+  es_exists _cc1 keyvalue _clientcmd __default-map server_var(_cc_default)
+  ifx true(_cc1) do
+  {
+    es_keygetvalue _cc_default _clientcmd __default-map server_var(_cc_default)
+    es :auth registerCapability server_var(_cc_perm) server_var(_cc_default)
+    es_regsaycmd server_var(_cc_name) corelib/clientcmd/say_proxy
+  }
+  else do
+  {
+    es_dbgmsg 0 "The accepted values for default permission are: #root, #admin, #poweruser, #known, and #all"
+  }
+  
+}
+
+block say_delete
+{
+  es_keydelete _clientcmd_say server_var(_cc_name)
+  es_unregsaycmd server_var(_cc_name)
+}
+
+block console_create
+{
+  es_xgetargv _cc_block 4
+  es_xgetargv _cc_perm 5
+  es_xgetargv _cc_default 6
+  es_keycreate _clientcmd_console server_var(_cc_name)
+  es_keysetvalue _clientcmd_console server_var(_cc_name) block server_var(_cc_block)
+  es_keysetvalue _clientcmd_console server_var(_cc_name) perm server_var(_cc_perm)
+  es_exists _cc1 keyvalue _clientcmd __default-map server_var(_cc_default)
+  ifx true(_cc1) do
+  {
+    es_keygetvalue _cc_default _clientcmd __default-map server_var(_cc_default)
+    es :auth registerCapability server_var(_cc_perm) server_var(_cc_default)
+    es_regclientcmd server_var(_cc_name) corelib/clientcmd/console_proxy
+  }
+  else do
+  {
+    es_dbgmsg 0 "The accepted values for default permission are: #root, #admin, #poweruser, #known, and #all"
+  }
+}
+
+block console_delete
+{
+  es_keydelete _clientcmd_console server_var(_cc_name)
+  es_unregclientcmd server_var(_cc_name)
+}
+
+block console_proxy
+{
+  es_xgetargv _cc_name 0
+  es_keygetvalue _cc_perm _clientcmd_console server_var(_cc_name) perm
+  services getregistered myvar auth
+  ifx false(myvar) do
+  {
+    es_dbgmsg 0 "WARNING: auth is not registed. It is recommended you create an auth provider"
+    // allow it if it doesn't require an admin
+    if (server_var(_cc_perm) > 2) do
+    {
+        es_keygetvalue _cc_block _clientcmd_console server_var(_cc_name) block
+        es_doblock server_var(_cc_block)    
+    } 
+  }
+  else do
+  { 
+    ifx true(_cc_perm) do
+    {
+      es_xgetcmduserid _cc_default
+      es :auth isUseridAuthorized _cc_block server_var(_cc_default) server_var(_cc_perm)
+      ifx true(_cc_block) do
+      {
+        es_keygetvalue _cc_block _clientcmd_console server_var(_cc_name) block
+        es_doblock server_var(_cc_block)
+      }
+      else do
+      {
+        es_tell server_var(_cc_default) #green [EventScripts] You do not have permission for that command: server_var(_cc_name)
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 "ERROR: Internal error for clientcmd. Registration messed-up for console command:"
+      es_dbgmsg 0 server_var(_cc_name)
+    }
+  }
+}
+
+block say_proxy
+{
+  es_xgetargv _cc_name 0
+  es_keygetvalue _cc_perm _clientcmd_say server_var(_cc_name) perm
+  services getregistered myvar auth
+  ifx false(myvar) do
+  {
+    es_dbgmsg 0 "WARNING: auth is not registed. It is recommended you create an auth provider"
+    // allow it if it doesn't require an admin
+    if (server_var(_cc_perm) > 2) do
+    {
+        es_keygetvalue _cc_block _clientcmd_console server_var(_cc_name) block
+        es_doblock server_var(_cc_block)    
+    } 
+  }
+  else do
+  { 
+    ifx true(_cc_perm) do
+    {
+      es_xgetcmduserid _cc_default
+      es :auth isUseridAuthorized _cc_block server_var(_cc_default) server_var(_cc_perm)
+      ifx true(_cc_block) do
+      {
+        es_keygetvalue _cc_block _clientcmd_say server_var(_cc_name) block
+        es_doblock server_var(_cc_block)
+      }
+      else do
+      {
+        es_tell server_var(_cc_default) #green [EventScripts] You do not have permission for that command: server_var(_cc_name)
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 "ERROR: Internal error for clientcmd. Registration messed-up for say command:"
+      es_dbgmsg 0 server_var(_cc_name)
+    }
+  }
+}
+

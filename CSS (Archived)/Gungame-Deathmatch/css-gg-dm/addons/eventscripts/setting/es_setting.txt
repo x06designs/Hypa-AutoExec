@@ -1,0 +1,1358 @@
+// setting command v0.4c
+// Submitted by [NATO]Hunter
+//
+// setting allows you to save global or player based settings
+// syntax:
+// setting create <settingname> "<description>" [type]
+// setting delete <settingname>
+// setting clear <settingname> [time-difference]
+// setting exists <return-var> <settingname>
+// setting addoption <settingname> <option-key> <option-name> "[description]"
+// setting remoption <settingname> <option-key>
+// setting clearoption <settingname>
+// setting addsound <settingname> <sound-path>
+// setting remsound <settingname>
+// setting send <settingname> <userid> [locked]
+// setting sendglobal <settingname> <userid> [locked]
+// setting list
+//
+// For "list" settings:
+// setting setdefault <settingname> <option-key>
+// setting get <return-var> <settingname> [userid]
+// setting set <settingname> <option-key> [userid]
+//
+// For "toggle" settings:
+// setting setdefault <settingname> <option-key> <1/0>
+// setting get <return-var> <settingname> <option-key> [userid]
+// setting set <settingname> <option-key> <1/0> [userid]
+// setting toggle <settingname> <option-key> [userid]
+//
+// Originally submitted by [NATO]Hunter
+
+block load
+{
+  es_xdoblock setting/setting_register
+}
+
+block unload
+{
+  es_xdoblock setting/unloadinstance
+  es_xkeygroupsave _setting_instance |setting
+  es_xkeygroupsave _setting_storage |setting
+  es_xkeygroupdelete _setting_instance
+  es_xkeygroupdelete _setting_storage
+}
+
+// called to register the setting command
+block setting_register
+{
+  // variables used by setting
+  es_xset _setting_cmd 0
+  es_xset _setting_name 0
+  es_xset _setting_descr 0
+  es_xset _setting_exists 0
+  es_xset _setting_uniqueid 0
+  es_xset _setting_userid 0
+  es_xset _setting_time 0
+  es_xset _setting_key 0
+  es_xset _setting_value 0
+  es_xset _setting_time 0
+  es_xset _setting_gettimestamp 0
+  es_xset _setting_temp 0
+  es_xset _setting_keygroup 0
+  es_xset _setting_type 0
+  es_xset _setting_option 0
+  es_xset _setting_string 0
+  es_xset _setting_result 0
+  es_xset _setting_toggle 0
+  es_xset _setting_sound 0
+  es_xset _setting_menu 0
+  es_xset _setting_return 0
+  es_xset _setting_helpline 0
+  es_xset _setting_lock 0
+  es_xset _setting_locked 0
+  es_xset _setting_sendglobal 0
+  es_xset _popup_userid 0
+  es_xkeygroupload _setting_instance |setting
+  es_xkeygroupload _setting_storage |setting
+  es_xset _setting_uniqueid __GLOBAL__
+  es_xdoblock setting/updateplayer
+  es_xdoblock setting/loadinstance
+  // check to see if setting exists
+  es_xexists _setting_exists command setting
+  ifx false(_setting_exists) do
+  {
+    // setting keygroup
+    es_xregcmd setting setting/setting "Allows you to handle settings."
+  }
+
+  setting exists _setting_temp listtest
+  ifx false(_setting_temp) do
+  {
+    setting create listtest "List Test" list
+    setting addoption listtest option_a "Option A" "Choose one option"
+    setting addoption listtest option_b "Option B"
+    setting addoption listtest option_c "Option C"
+    setting addoption listtest option_d "Option D"
+    setting addoption listtest option_e "Option E"
+    setting setdefault listtest option_c
+    setting addsound listtest "ui/buttonclick.wav"
+  }
+  setting exists _setting_temp toggletest
+  ifx false(_setting_temp) do
+  {
+    setting create toggletest "Toggle Test" toggle
+    setting addoption toggletest toggle_a "Toggle A" "Toogle these options"
+    setting addoption toggletest toggle_b "Toggle B"
+    setting addoption toggletest toggle_c "Toggle C"
+    setting setdefault toggletest toggle_a 1
+    setting setdefault toggletest toggle_b 0
+    setting addsound toggletest "ui/buttonrollover.wav"
+  }
+
+  foreach player _setting_temp #all "es_xdoblock setting/updateplayer_loadup"
+  es_xkeygroupsave _setting_storage |setting
+
+  testcase qcreate corelib settingtest "Tests setting"
+  testcase addtest settingtest settingtest1 setting/setting_setget_test "Test setget cases"
+}
+
+block setting
+{
+  // get the operation they want to do
+  es_xgetargv _setting_cmd 1
+  es_format _setting_cmd "setting/setting_cmd_%1" server_var(_setting_cmd)
+  es_exists _setting_exists block server_var(_setting_cmd)
+  ifx true(_setting_exists) do
+  {
+    es_doblock server_var(_setting_cmd)
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid subcommand for setting.
+  }
+}
+
+block setting_cmd_create
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_descr 3
+    ifx true(_setting_descr) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx false(_setting_exists) do
+      {
+        es_xgetargv _setting_type 4
+        if (server_var(_setting_type) != "toggle") do
+        {
+          es_xset _setting_type "list"
+        }
+        es_keycreate _setting_instance server_var(_setting_name)
+        es_keysetvalue _setting_instance server_var(_setting_name) descr server_var(_setting_descr)
+        es_keysetvalue _setting_instance server_var(_setting_name) type server_var(_setting_type)
+        if (server_var(_setting_type) == "list") do
+        {
+          es_keysetvalue _setting_instance server_var(_setting_name) def 0
+        }
+        es_xformatv _setting_keygroup "_setting__%1" _setting_name
+        es_keygroupcreate server_var(_setting_keygroup)
+        es_keygroupsave server_var(_setting_keygroup) |setting
+        es_xkeygroupsave _setting_instance |setting
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting does already exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting create. Syntax: setting create <settingname> "<description>" [type]
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting create. Syntax: setting create <settingname> "<description>" [type]
+  }
+}
+
+block setting_cmd_delete
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_exists _setting_exists key _setting_instance server_var(_setting_name)
+    ifx true(_setting_exists) do
+    {
+      es_keydelete _setting_instance server_var(_setting_name)
+      es_xformatv _setting_keygroup "_setting__%1" _setting_name
+      es keygroupremove server_var(_setting_keygroup)
+      es_keygroupcreate server_var(_setting_keygroup)
+      es_keygroupsave server_var(_setting_keygroup) |setting
+      es_keygroupdelete server_var(_setting_keygroup)
+      es_xkeygroupsave _setting_instance |setting
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: This setting does not exists.
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting delete. Syntax: setting delete <settingname>
+  }
+}
+
+block setting_cmd_clear
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_exists _setting_exists key _setting_instance server_var(_setting_name)
+    ifx true(_setting_exists) do
+    {
+      es_xgetargv _setting_time 3
+      ifx true(_setting_time) do
+      {
+        es_xforeachkey _setting_key in _setting_storage "es_xdoblock setting/setting_clearloop_time"
+      }
+      else do
+      {
+        es_xforeachkey _setting_key in _setting_storage "es_xdoblock setting/setting_clearloop"
+      }
+      es_xkeygroupsave _setting_storage |setting
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: This setting (key) does not exists.
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting clear. Syntax: setting clear <settingname> [time-difference]
+  }
+}
+
+block setting_clearloop_time
+{
+  if (server_var(_setting_key) != "__GLOBAL__") do
+  {
+    es_keygetvalue _setting_temp _setting_storage server_var(_setting_key) "__TIMESTAMP__"
+    es_xgettimestamp _setting_gettimestamp
+    es_math _setting_gettimestamp - server_var(_setting_temp)
+    if (server_var(_setting_gettimestamp) > server_var(_setting_time)) do
+    {
+      es_keysetvalue _setting_storage server_var(_setting_key) server_var(_setting_name) 0
+    }
+  }
+}
+
+block setting_clearloop
+{
+  if (server_var(_setting_key) != "__GLOBAL__") do
+  {
+    es_keysetvalue _setting_storage server_var(_setting_key) server_var(_setting_name) 0
+  }
+}
+
+block setting_cmd_exists
+{
+  es_xgetargv _setting_value 2
+  ifx true(_setting_value) do
+  {
+    es_xgetargv _setting_name 3
+    es_xstring _setting_name replace "_" "-"
+    ifx true(_setting_name) do
+    {
+      es_exists server_var(_setting_value) key _setting_instance server_var(_setting_name)
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting exists. Syntax: setting exists <return-var> <settingname>
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting exists. Syntax: setting exists <return-var> <settingname>
+  }
+}
+
+block setting_cmd_addoption
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_key 3
+    ifx true(_setting_key) do
+    {
+      es_xgetargv _setting_value 4
+      ifx true(_setting_value) do
+      {
+        es_exists _setting_exists key _setting_instance server_var(_setting_name)
+        ifx true(_setting_exists) do
+        {
+          es_xformatv _setting_keygroup "_setting__%1" _setting_name
+          es_exists _setting_exists keygroup server_var(_setting_keygroup)
+          ifx true(_setting_exists) do
+          {
+            es_xformatv _setting_key "%1_%2" _setting_name _setting_key
+            es_exists _setting_exists key server_var(_setting_keygroup) server_var(_setting_key)
+            ifx false(_setting_exists) do
+            {
+              es_keycreate server_var(_setting_keygroup) server_var(_setting_key)
+            }
+            es_keysetvalue server_var(_setting_keygroup) server_var(_setting_key) name server_var(_setting_value)
+            es_keysetvalue server_var(_setting_keygroup) server_var(_setting_key) string 0
+            es_xgetargv _setting_descr 5
+            ifx true(_setting_descr) do
+            {
+              es_keysetvalue server_var(_setting_keygroup) server_var(_setting_key) descr server_var(_setting_descr)
+            }
+            es_keygroupsave server_var(_setting_keygroup) |setting
+          }
+          else do
+          {
+            es_xdbgmsg 0 setting: This setting (keygroup) does not exists.
+          }
+        }
+        else do
+        {
+          es_xdbgmsg 0 setting: This setting (key) does not exists.
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: Invalid arguments for setting addoption. Syntax: setting addoption <settingname> <option-key> <option-name> "[description]"
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting addoption. Syntax: setting addoption <settingname> <option-key> <option-name> "[description]"
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting addoption. Syntax: setting addoption <settingname> <option-key> <option-name> "[description]"
+  }
+}
+
+block setting_cmd_remoption
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_key 3
+    ifx true(_setting_key) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx true(_setting_exists) do
+      {
+        es_xformatv _setting_keygroup "_setting__%1" _setting_name
+        es_exists _setting_exists keygroup server_var(_setting_keygroup)
+        ifx true(_setting_exists) do
+        {
+          es_xformatv _setting_value "%1_%2" _setting_name _setting_key
+          es_exists _setting_exists key server_var(_setting_keygroup) server_var(_setting_value)
+          ifx true(_setting_exists) do
+          {
+            es_keygetvalue _setting_temp _setting_instance server_var(_setting_name) def
+            if (server_var(_setting_temp) == server_var(_setting_value)) do
+            {
+              es_keysetvalue _setting_instance server_var(_setting_name) def 0
+              es_xkeygroupsave _setting_instance |setting
+            }
+            es_xformatv _setting_value "def_%1" _setting_key
+            es_keygetvalue _setting_temp _setting_instance server_var(_setting_name) server_var(_setting_value)
+            ifx true(_setting_temp) do
+            {
+              es_keysetvalue _setting_instance server_var(_setting_name) server_var(_setting_value) 0
+              es_xkeygroupsave _setting_instance |setting
+            }
+            es_keydelete server_var(_setting_keygroup) server_var(_setting_key)
+            es_keygroupsave server_var(_setting_keygroup) |setting
+          }
+          else do
+          {
+            es_xdbgmsg 0 setting: This option does not exists.
+          }
+        }
+        else do
+        {
+          es_xdbgmsg 0 setting: This setting (keygroup) does not exists.
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (key) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting remoption. Syntax: setting remoption <settingname> <option-key>
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting remoption. Syntax: setting remoption <settingname> <option-key>
+  }
+}
+
+block setting_cmd_clearoption
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_exists _setting_exists key _setting_instance server_var(_setting_name)
+    ifx true(_setting_exists) do
+    {
+      es_xformatv _setting_keygroup "_setting__%1" _setting_name
+      es_exists _setting_exists keygroup server_var(_setting_keygroup)
+      ifx true(_setting_exists) do
+      {
+        es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_clearoption_loop"
+        es_keygroupsave server_var(_setting_keygroup) |setting
+        es_xkeygroupsave _setting_instance |setting
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (keygroup) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: This setting (key) does not exists.
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting clearoption. Syntax: setting clearoption <settingname>
+  }
+}
+
+block setting_clearoption_loop
+{
+  es_xformatv _setting_value "%1_%2" _setting_name _setting_key
+  es_exists _setting_exists key server_var(_setting_keygroup) server_var(_setting_value)
+  ifx true(_setting_exists) do
+  {
+    es_keygetvalue _setting_temp _setting_instance server_var(_setting_name) def
+    if (server_var(_setting_temp) == server_var(_setting_value)) do
+    {
+      es_keysetvalue _setting_instance server_var(_setting_name) def 0
+    }
+    es_xformatv _setting_value "def_%1" _setting_key
+    es_keygetvalue _setting_temp _setting_instance server_var(_setting_name) server_var(_setting_value)
+    ifx true(_setting_temp) do
+    {
+      es_keysetvalue _setting_instance server_var(_setting_name) server_var(_setting_value) 0
+    }
+    es_keydelete server_var(_setting_keygroup) server_var(_setting_key)
+  }
+}
+
+block setting_cmd_addsound
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_sound 3
+    ifx true(_setting_sound) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx true(_setting_exists) do
+      {
+        es_keysetvalue _setting_instance server_var(_setting_name) sound server_var(_setting_sound)
+        es_xkeygroupsave _setting_instance |setting
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (key) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting addsound. Syntax: setting addsound <settingname> <sound-path>
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting addsound. Syntax: setting addsound <settingname> <sound-path>
+  }
+}
+
+block setting_cmd_remsound
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_exists _setting_exists key _setting_instance server_var(_setting_name)
+    ifx true(_setting_exists) do
+    {
+      es_keysetvalue _setting_instance server_var(_setting_name) sound 0
+      es_xkeygroupsave _setting_instance |setting
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: This setting (key) does not exists.
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting remsound. Syntax: setting remsound <settingname>
+  }
+}
+
+block setting_cmd_send
+{
+  es_xexists _setting_temp script keymenu
+  ifx true(_setting_temp) do
+  {
+    es_xgetargv _setting_name 2
+    es_xstring _setting_name replace "_" "-"
+    ifx true(_setting_name) do
+    {
+      es_xgetargv _setting_userid 3
+      ifx true(_setting_userid) do
+      {
+        es_exists _setting_exists key _setting_instance server_var(_setting_name)
+        ifx true(_setting_exists) do
+        {
+          es_xformatv _setting_keygroup "_setting__%1" _setting_name
+          es_exists _setting_exists keygroup server_var(_setting_keygroup)
+          ifx true(_setting_exists) do
+          {
+            es_getuserid _setting_userid server_var(_setting_userid)
+            ifx true(_setting_userid) do
+            {
+              es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+              es_xcopy _popup_userid _setting_userid
+              es_xset _setting_sendglobal 0
+              if (server_var(_setting_type) == "list") do
+              {
+                es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_list"
+                es_xset _setting_helpline "You can choose one of these options"
+              }
+              else do
+              {
+                es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_toggle"
+                es_xset _setting_helpline "You can toggle each option on or off"
+              }
+              es_keygetvalue _setting_descr _setting_instance server_var(_setting_name) descr
+              es_xformatv _setting_menu "%1_%2" _setting_name _setting_userid
+              es_xformatv _setting_descr "%1\n%2" _setting_descr _setting_helpline
+              es keymenu exists _setting_exists server_var(_setting_menu)
+              ifx true(_setting_exists) do
+              {
+                es keymenu delete server_var(_setting_menu)
+              }
+              es_xgetargv _setting_locked 4
+              ifx false(_setting_locked) do
+              {
+                esnq keymenu create server_var(_setting_menu) _setting_key setting/setting_submit server_var(_setting_keygroup) #keyvalue string #key server_var(_setting_descr)
+              }
+              else do
+              {
+                esnq keymenu create server_var(_setting_menu) _setting_key setting/setting_dummy server_var(_setting_keygroup) #keyvalue string #key server_var(_setting_descr)
+              }
+              es keymenu send server_var(_setting_menu) server_var(_setting_userid)
+            }
+            else do
+            {
+              es_xdbgmsg 0 setting: This userid does not exists.
+            }
+          }
+          else do
+          {
+            es_xdbgmsg 0 setting: This setting (keygroup) does not exists.
+          }
+        }
+        else do
+        {
+          es_xdbgmsg 0 setting: This setting (key) does not exists.
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: Invalid arguments for setting send. Syntax: setting send <settingname> <userid>
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting send. Syntax: setting send <settingname> <userid>
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: keymenu lib has to be loaded!
+  }
+}
+
+block setting_cmd_sendglobal
+{
+  es_xexists _setting_temp script keymenu
+  ifx true(_setting_temp) do
+  {
+    es_xgetargv _setting_name 2
+    es_xstring _setting_name replace "_" "-"
+    ifx true(_setting_name) do
+    {
+      es_xgetargv _setting_userid 3
+      ifx true(_setting_userid) do
+      {
+        es_exists _setting_exists key _setting_instance server_var(_setting_name)
+        ifx true(_setting_exists) do
+        {
+          es_xformatv _setting_keygroup "_setting__%1" _setting_name
+          es_exists _setting_exists keygroup server_var(_setting_keygroup)
+          ifx true(_setting_exists) do
+          {
+            es_getuserid _setting_userid server_var(_setting_userid)
+            ifx true(_setting_userid) do
+            {
+              es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+              es_xset _setting_sendglobal 1
+              if (server_var(_setting_type) == "list") do
+              {
+                es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_list"
+                es_xset _setting_helpline "You can choose one of these options"
+              }
+              else do
+              {
+                es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_toggle"
+                es_xset _setting_helpline "You can toggle each option on or off"
+              }
+              es_keygetvalue _setting_descr _setting_instance server_var(_setting_name) descr
+              es_xformatv _setting_menu "%1_%2" _setting_name _setting_userid
+              es_xformatv _setting_descr "%1\n%2" _setting_descr _setting_helpline
+              es keymenu exists _setting_exists server_var(_setting_menu)
+              ifx true(_setting_exists) do
+              {
+                es keymenu delete server_var(_setting_menu)
+              }
+              es_xgetargv _setting_locked 4
+              ifx false(_setting_locked)
+              {
+                esnq keymenu create server_var(_setting_menu) _setting_key setting/setting_submitglobal server_var(_setting_keygroup) #keyvalue string #key server_var(_setting_descr)
+              }
+              else do
+              {
+                esnq keymenu create server_var(_setting_menu) _setting_key setting/setting_dummy server_var(_setting_keygroup) #keyvalue string #key server_var(_setting_descr)
+              }
+              es keymenu send server_var(_setting_menu) server_var(_setting_userid)
+            }
+            else do
+            {
+              es_xdbgmsg 0 setting: This userid does not exists.
+            }
+          }
+          else do
+          {
+            es_xdbgmsg 0 setting: This setting (keygroup) does not exists.
+          }
+        }
+        else do
+        {
+          es_xdbgmsg 0 setting: This setting (key) does not exists.
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: Invalid arguments for setting sendglobal. Syntax: setting sendglobal <settingname> <userid>
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting sendglobal. Syntax: setting sendglobal <settingname> <userid>
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: keymenu lib has to be loaded!
+  }
+}
+
+block setting_submit
+{
+  es_token _setting_name server_var(_setting_key) 1 "_"
+  es_exists _setting_temp key _setting_instance server_var(_setting_name)
+  ifx true(_setting_temp) do
+  {
+    es_xcopy _setting_userid _popup_userid
+    es_xcopy _setting_value _setting_key
+    es_xformatv _setting_temp "%1_" _setting_name
+    es_xstring _setting_value replacev _setting_temp
+    es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+    es_keygetvalue _setting_sound _setting_instance server_var(_setting_name) sound
+    ifx true(_setting_sound) do
+    {
+      es_cexec server_var(_setting_userid) play server_var(_setting_sound)
+    }
+    if (server_var(_setting_type) == "list") do
+    {
+      es setting set server_var(_setting_name) server_var(_setting_value) server_var(_setting_userid)
+    }
+    else do
+    {
+      es setting toggle server_var(_setting_name) server_var(_setting_value) server_var(_setting_userid)
+    }
+    es_xformatv _setting_keygroup "_setting__%1" _setting_name
+    es_exists _setting_temp keygroup server_var(_setting_keygroup)
+    ifx true(_setting_temp) do
+    {
+      if (server_var(_setting_type) == "list") do
+      {
+        es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_list"
+        es_xset _setting_helpline "You can choose one of these options"
+      }
+      else do
+      {
+        es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_toggle"
+        es_xset _setting_helpline "You can toggle each option on or off"
+      }
+      es_keygetvalue _setting_descr _setting_instance server_var(_setting_name) descr
+      es_xformatv _setting_menu "%1_%2" _setting_name _setting_userid
+      es_xformatv _setting_descr "%1\n%2" _setting_descr _setting_helpline
+      es keymenu exists _setting_exists server_var(_setting_menu)
+      ifx true(_setting_exists) do
+      {
+        es keymenu delete server_var(_setting_menu)
+      }
+      esnq keymenu create server_var(_setting_menu) _setting_key setting/setting_submit server_var(_setting_keygroup) #keyvalue string #key server_var(_setting_descr)
+      es keymenu send server_var(_setting_menu) server_var(_setting_userid)
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: menu: Submitted setting (keygroup) does not exists!
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: menu: Submitted setting (key) does not exists!
+  }
+}
+
+block setting_submitglobal
+{
+  es_token _setting_name server_var(_setting_key) 1 "_"
+  es_exists _setting_temp key _setting_instance server_var(_setting_name)
+  ifx true(_setting_temp) do
+  {
+    es_xcopy _setting_userid _popup_userid
+    es_xcopy _setting_value _setting_key
+    es_xformatv _setting_temp "%1_" _setting_name
+    es_xstring _setting_value replacev _setting_temp
+    es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+    es_keygetvalue _setting_sound _setting_instance server_var(_setting_name) sound
+    ifx true(_setting_sound) do
+    {
+      es_cexec server_var(_setting_userid) play server_var(_setting_sound)
+    }
+    if (server_var(_setting_type) == "list") do
+    {
+      es setting set server_var(_setting_name) server_var(_setting_value)
+    }
+    else do
+    {
+      es setting toggle server_var(_setting_name) server_var(_setting_value)
+    }
+    es_xformatv _setting_keygroup "_setting__%1" _setting_name
+    es_exists _setting_temp keygroup server_var(_setting_keygroup)
+    ifx true(_setting_temp) do
+    {
+      es_xset _setting_sendglobal 1
+      if (server_var(_setting_type) == "list") do
+      {
+        es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_list"
+        es_xset _setting_helpline "You can choose one of these options"
+      }
+      else do
+      {
+        es_foreachkey _setting_key in server_var(_setting_keygroup) "es_xdoblock setting/setting_createstring_toggle"
+        es_xset _setting_helpline "You can toggle each option on or off"
+      }
+      es_keygetvalue _setting_descr _setting_instance server_var(_setting_name) descr
+      es_xformatv _setting_menu "%1_%2" _setting_name _setting_userid
+      es_xformatv _setting_descr "%1\n%2" _setting_descr _setting_helpline
+      es keymenu exists _setting_exists server_var(_setting_menu)
+      ifx true(_setting_exists) do
+      {
+        es keymenu delete server_var(_setting_menu)
+      }
+      esnq keymenu create server_var(_setting_menu) _setting_key setting/setting_submitglobal server_var(_setting_keygroup) #keyvalue string #key server_var(_setting_descr)
+      es keymenu send server_var(_setting_menu) server_var(_setting_userid)
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: menu: Submitted setting (keygroup) does not exists!
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: menu: Submitted setting (key) does not exists!
+  }
+}
+
+block setting_createstring_list
+{
+  es_keygetvalue _setting_value server_var(_setting_keygroup) server_var(_setting_key) name
+  es_keygetvalue _setting_descr server_var(_setting_keygroup) server_var(_setting_key) descr
+  es uniqueid _setting_uniqueid server_var(_setting_userid) 1
+  ifx true(_setting_sendglobal) do
+  {
+    es_xset _setting_uniqueid __GLOBAL__
+  }
+  es_keygetvalue _setting_temp _setting_storage server_var(_setting_uniqueid) server_var(_setting_name)
+  ifx false(_setting_temp) do
+  {
+    es_keygetvalue _setting_temp _setting_instance server_var(_setting_name) def
+  }
+  if (server_var(_setting_key) == server_var(_setting_temp)) do
+  {
+    ifx true(_setting_descr) do
+    {
+      es_xformatv _setting_value "%1 (active) - %2" _setting_value _setting_descr
+    }
+    else do
+    {
+      es_xformatv _setting_value "%1 (active)" _setting_value
+    }
+    es_keysetvalue server_var(_setting_keygroup) server_var(_setting_key) string server_var(_setting_value)
+  }
+  else do
+  {
+    ifx true(_setting_descr) do
+    {
+      es_xformatv _setting_value "%1 - %2" _setting_value _setting_descr
+    }
+    es_keysetvalue server_var(_setting_keygroup) server_var(_setting_key) string server_var(_setting_value)
+  }
+}
+
+block setting_createstring_toggle
+{
+  es_keygetvalue _setting_value server_var(_setting_keygroup) server_var(_setting_key) name
+  es_keygetvalue _setting_descr server_var(_setting_keygroup) server_var(_setting_key) descr
+  es uniqueid _setting_uniqueid server_var(_setting_userid) 1
+  ifx true(_setting_sendglobal) do
+  {
+    es_xset _setting_uniqueid __GLOBAL__
+  }
+  es_xcopy _setting_option _setting_key
+  es_xformatv _setting_temp "%1_" _setting_name
+  es_xstring _setting_option replacev _setting_temp
+  es_xformatv _setting_string ",%1" _setting_option
+  es_keygetvalue _setting_temp _setting_storage server_var(_setting_uniqueid) server_var(_setting_name)
+  es_xset _setting_toggle 0
+  es foreach token _setting_result server_var(_setting_temp) ";" "es_xdoblock setting/setting_createstring_toggle_findoptionkey"
+  ifx false(_setting_toggle) do
+  {
+    es_xformatv _setting_string "def_%1" _setting_option
+    es_keygetvalue _setting_toggle _setting_instance server_var(_setting_name) server_var(_setting_string)
+  }
+  ifx true(_setting_descr) do
+  {
+    es_xformatv _setting_value "%1 (%2) - %3" _setting_value _setting_toggle _setting_descr
+  }
+  else do
+  {
+    es_xformatv _setting_value "%1 (%2)" _setting_value _setting_toggle
+  }
+  es_keysetvalue server_var(_setting_keygroup) server_var(_setting_key) string server_var(_setting_value)
+}
+
+block setting_createstring_toggle_findoptionkey
+{
+  if (server_var(_setting_string) in server_var(_setting_result)) do
+  {
+    es_token _setting_toggle server_var(_setting_result) 1 ","
+  }
+}
+
+block setting_cmd_setdefault
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_key 3
+    ifx true(_setting_key) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx true(_setting_exists) do
+      {
+        es_xformatv _setting_keygroup "_setting__%1" _setting_name
+        es_exists _setting_exists keygroup server_var(_setting_keygroup)
+        ifx true(_setting_exists) do
+        {
+          es_xformatv _setting_value "%1_%2" _setting_name _setting_key
+          es_exists _setting_exists key server_var(_setting_keygroup) server_var(_setting_value)
+          ifx true(_setting_exists) do
+          {
+            es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+            if (server_var(_setting_type) == "list") do
+            {
+              es_keysetvalue _setting_instance server_var(_setting_name) def server_var(_setting_value)
+            }
+            else do
+            {
+              es_xformatv _setting_temp "def_%1" _setting_key
+              es_xgetargv _setting_value 4
+              ifx true(_setting_value) do
+              {
+                es_keysetvalue _setting_instance server_var(_setting_name) server_var(_setting_temp) on
+              }
+              else do
+              {
+                es_keysetvalue _setting_instance server_var(_setting_name) server_var(_setting_temp) off
+              }
+            }
+            es_xkeygroupsave _setting_instance |setting
+          }
+          else do
+          {
+            es_xdbgmsg 0 setting: This option does not exists.
+          }
+        }
+        else do
+        {
+          es_xdbgmsg 0 setting: This setting (keygroup) does not exists.
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (key) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting setdefault. Syntax: setting setdefault <settingname> <option-key> [1/0]
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting setdefault. Syntax: setting setdefault <settingname> <option-key> [1/0]
+  }
+}
+
+block setting_cmd_get
+{
+  es_xgetargv _setting_value 2
+  ifx true(_setting_value) do
+  {
+    es_xgetargv _setting_name 3
+    es_xstring _setting_name replace "_" "-"
+    ifx true(_setting_name) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx true(_setting_exists) do
+      {
+        es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+        if (server_var(_setting_type) == "list") do
+        {
+          es_xgetargv _setting_temp 4
+          ifx true(_setting_temp) do
+          {
+            es uniqueid _setting_uniqueid server_var(_setting_temp) 1
+          }
+          else do
+          {
+            es_xset _setting_uniqueid __GLOBAL__
+          }
+          es_xset _setting_return 0
+          es_set server_var(_setting_value) 0
+          es_keygetvalue _setting_return _setting_storage server_var(_setting_uniqueid) server_var(_setting_name)
+          es_xformatv _setting_temp "%1_" _setting_name
+          es_xstring _setting_return replacev _setting_temp
+          ifx false(_setting_return) do
+          {
+            es_keygetvalue _setting_return _setting_instance server_var(_setting_name) def
+            es_xstring _setting_return replacev _setting_temp
+          }
+          es_set server_var(_setting_value) server_var(_setting_return)
+        }
+        else do
+        {
+          es_xgetargv _setting_option 4
+          ifx true(_setting_option) do
+          {
+            es_xformatv _setting_string ",%1" _setting_option
+            es_xgetargv _setting_temp 5
+            ifx true(_setting_temp) do
+            {
+              es uniqueid _setting_uniqueid server_var(_setting_temp) 1
+            }
+            else do
+            {
+              es_xset _setting_uniqueid __GLOBAL__
+            }
+            es_keygetvalue _setting_temp _setting_storage server_var(_setting_uniqueid) server_var(_setting_name)
+            es_xset _setting_return 0
+            ifx true(_setting_temp) do
+            {
+              es foreach token _setting_result server_var(_setting_temp) ";" "es_xdoblock setting/setting_findoptionkey"
+            }
+            ifx false(_setting_return) do
+            {
+              es_xformatv _setting_key "def_%1" _setting_option
+              es_keygetvalue _setting_return _setting_instance server_var(_setting_name) server_var(_setting_key)
+            }
+            es_set server_var(_setting_value) 0
+            if (server_var(_setting_return) == "on") do
+            {
+              es_set server_var(_setting_value) 1
+            }
+          }
+          else do
+          {
+            es_xdbgmsg 0 setting: Invalid arguments for setting get. No [option-key] specified.
+          }
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (key) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting get. Syntax: setting get <return-var> <settingname> [option-key] [userid]
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting get. Syntax: setting get <return-var> <settingname> [option-key] [userid]
+  }
+}
+
+block setting_cmd_set
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_key 3
+    ifx true(_setting_key) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx true(_setting_exists) do
+      {
+        es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+        if (server_var(_setting_type) == "list") do
+        {
+          es_xgetargv _setting_temp 4
+          ifx true(_setting_temp) do
+          {
+            es uniqueid _setting_uniqueid server_var(_setting_temp) 1
+          }
+          else do
+          {
+            es_xset _setting_uniqueid __GLOBAL__
+          }
+          es_xformatv _setting_key "%1_%2" _setting_name _setting_key
+          es_keysetvalue _setting_storage server_var(_setting_uniqueid) server_var(_setting_name) server_var(_setting_key)
+        }
+        else do
+        {
+          es_xgetargv _setting_string 4
+          es_xgetargv _setting_temp 5
+          ifx true(_setting_temp) do
+          {
+            es uniqueid _setting_uniqueid server_var(_setting_temp) 1
+          }
+          else do
+          {
+            es_xset _setting_uniqueid __GLOBAL__
+          }
+          es_keygetvalue _setting_value _setting_storage server_var(_setting_uniqueid) server_var(_setting_name)
+          ifx true(_setting_string) do
+          {
+            es_xformatv _setting_temp "off,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_temp "on,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_value "%1%2" _setting_value _setting_temp
+          }
+          else do
+          {
+            es_xformatv _setting_temp "on,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_temp "off,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_value "%1%2" _setting_value _setting_temp
+          }
+          es_keysetvalue _setting_storage server_var(_setting_uniqueid) server_var(_setting_name) server_var(_setting_value)
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (key) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting set. Syntax: setting set <settingname> <option-key> [1/0] [userid]
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting set. Syntax: setting set <settingname> <option-key> [1/0] [userid]
+  }
+}
+
+block setting_cmd_toggle
+{
+  es_xgetargv _setting_name 2
+  es_xstring _setting_name replace "_" "-"
+  ifx true(_setting_name) do
+  {
+    es_xgetargv _setting_key 3
+    ifx true(_setting_key) do
+    {
+      es_exists _setting_exists key _setting_instance server_var(_setting_name)
+      ifx true(_setting_exists) do
+      {
+        es_keygetvalue _setting_type _setting_instance server_var(_setting_name) type
+        if (server_var(_setting_type) == "toggle") do
+        {
+          es_xgetargv _setting_temp 4
+          ifx true(_setting_temp) do
+          {
+            es uniqueid _setting_uniqueid server_var(_setting_temp) 1
+          }
+          else do
+          {
+            es_xset _setting_uniqueid __GLOBAL__
+          }
+          es_keygetvalue _setting_value _setting_storage server_var(_setting_uniqueid) server_var(_setting_name)
+          es_xformatv _setting_temp "off,%1;" _setting_key
+          if (server_var(_setting_temp) in server_var(_setting_value)) do
+          {
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_temp "on,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_value "%1%2" _setting_value _setting_temp
+          }
+          else do
+          {
+            es_xformatv _setting_temp "on,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_temp "off,%1;" _setting_key
+            es_xstring _setting_value replacev _setting_temp
+            es_xformatv _setting_value "%1%2" _setting_value _setting_temp
+          }
+          es_xstring _setting_value replace "0on," "on,"
+          es_xstring _setting_value replace "0off," "off,"
+          es_keysetvalue _setting_storage server_var(_setting_uniqueid) server_var(_setting_name) server_var(_setting_value)
+        }
+        else do
+        {
+          es_xdbgmsg 0 setting: This setting does not have the toggle type.
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 setting: This setting (key) does not exists.
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 setting: Invalid arguments for setting toggle. Syntax: setting toggle <settingname> <option-key> [userid]
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 setting: Invalid arguments for setting toggle. Syntax: setting toggle <settingname> <option-key> [userid]
+  }
+}
+
+block setting_findoptionkey
+{
+  if (server_var(_setting_string) in server_var(_setting_result)) do
+  {
+    es_token _setting_return server_var(_setting_result) 1 ","
+  }
+}
+
+block setting_cmd_list
+{
+  es_xdbgmsg 0 Registered setting names:
+  es_xdbgmsg 0 -------------------------
+  es_xset _setting_temp 0
+  es_xforeachkey _setting_key in _setting_instance "es_xdoblock setting/setting_listloop"
+  es_xdbgmsg 0 -------------------------
+}
+
+block setting_listloop
+{
+  es_xmath _setting_temp + 1
+  es_xformatv _setting_string "%1: %2" _setting_temp _setting_key
+  es_xdbgmsgv 0 _setting_string
+  es_xformatv _setting_keygroup "_setting__%1" _setting_key
+  es_foreachkey _setting_option in server_var(_setting_keygroup) "es_xdoblock setting/setting_listloop_sub"
+}
+
+block setting_listloop_sub
+{
+  es_xformatv _setting_string "%1_" _setting_key
+  es_xstring _setting_option replacev _setting_string
+  es_xformatv _setting_string "    - %1" _setting_option
+  es_xdbgmsgv 0 _setting_string
+}
+
+event es_map_start
+{
+  es_xset _setting_lock 0
+  es_xset _setting_uniqueid __GLOBAL__
+  es_xdoblock setting/updateplayer
+  es_xdelayed 60 es_xdoblock setting/savealldata 
+  // first time save after 1 minute
+}
+
+event player_activate
+{
+  es uniqueid _setting_uniqueid event_var(userid) 1
+  es_xdoblock setting/updateplayer
+  ifx false(_setting_lock) do
+  {
+    es_xset _setting_lock 1
+    es_xdelayed 60 es_xset _setting_lock 0
+    es_xkeygroupsave _setting_storage |setting
+  }
+}
+
+event player_team
+{
+  if (event_var(disconnect) != 1) do
+  {
+    es uniqueid _setting_uniqueid event_var(userid) 1
+    es_xdoblock setting/updateplayer
+    ifx false(_setting_lock) do
+    {
+      es_xset _setting_lock 1
+      es_xdelayed 60 es_xset _setting_lock 0
+      es_xkeygroupsave _setting_storage |setting
+    }
+  }
+}
+
+block savealldata
+{
+  es_xkeygroupsave _setting_instance |setting
+  es_xkeygroupsave _setting_storage |setting
+  es_xdelayed 300 es_xdoblock setting/savealldata 
+  // save every 5 minutes
+}
+
+block loadinstance
+{
+  es_xforeachkey _setting_key in _setting_instance "es_xdoblock setting/loadinstance_loop"
+}
+
+block loadinstance_loop
+{
+  es_xformatv _setting_keygroup "_setting__%1" _setting_key
+  es keygroupremove server_var(_setting_keygroup)
+  es_keygroupload server_var(_setting_keygroup) |setting
+  es_xformatv _setting_string "[Setting] Loaded: %1" _setting_key
+  es_xdbgmsgv 0 _setting_string
+}
+
+block unloadinstance
+{
+  es_xforeachkey _setting_key in _setting_instance "es_xdoblock setting/unloadinstance_loop"
+}
+
+block unloadinstance_loop
+{
+  es_xformatv _setting_keygroup "_setting__%1" _setting_key
+  es_keygroupsave server_var(_setting_keygroup) |setting
+  es keygroupremove server_var(_setting_keygroup)
+  es_xformatv _setting_string "[Setting] Saved/Unloaded: %1" _setting_key
+  es_xdbgmsgv 0 _setting_string
+}
+
+block updateplayer
+{
+  es_exists _setting_exists key _setting_storage server_var(_setting_uniqueid)
+  ifx false(_setting_exists) do
+  {
+    es_keycreate _setting_storage server_var(_setting_uniqueid)
+  }
+  es_xgettimestamp _setting_gettimestamp
+  es_keysetvalue _setting_storage server_var(_setting_uniqueid) "__TIMESTAMP__" server_var(_setting_gettimestamp)
+}
+
+block updateplayer_loadup
+{
+  es uniqueid _setting_uniqueid server_var(_setting_temp) 1
+  es_xdoblock setting/updateplayer
+}
+
+block setting_dummy
+{
+  // dummy block
+}
+
+// Test stuff
+block setting_setget_test
+{
+  es_xset myvar 0
+
+  testlib begin set1 "Testing whether or not set/get works for a list setting 1"
+  es_xset myvar 0
+  setting set listtest option_a
+  setting get myvar listtest
+  testlib fail_unless myvar equalto option_a
+  testlib end
+
+  testlib begin set2 "Testing whether or not set/get works for a list setting 2"
+  es_xset myvar 0
+  setting set listtest option_c
+  setting get myvar listtest
+  testlib fail_unless myvar equalto option_c
+  testlib end
+
+  testlib begin set3 "Testing whether or not set/get works for a list setting 3"
+  es_xset myvar 0
+  setting set listtest option_e
+  setting get myvar listtest
+  testlib fail_unless myvar equalto option_e
+  testlib end
+
+  testlib begin set4 "Testing whether or not set/get works for a toggle setting 4"
+  es_xset myvar 0
+  setting set toggletest toggle_a 1
+  setting get myvar toggletest toggle_a
+  testlib fail_unless myvar equalto 1
+  testlib end
+
+  testlib begin set5 "Testing whether or not set/get works for a toggle setting 5"
+  es_xset myvar 0
+  setting set toggletest toggle_a 0
+  setting get myvar toggletest toggle_a
+  testlib fail_unless myvar equalto 0
+  testlib end
+
+  testlib begin set6 "Testing whether or not set/get works for a toggle setting 6"
+  es_xset myvar 0
+  setting set toggletest toggle_c 1
+  setting get myvar toggletest toggle_c
+  testlib fail_unless myvar equalto 1
+  testlib end
+
+  testlib begin set7 "Testing whether or not set/get works for a toggle setting 7"
+  es_xset myvar 0
+  setting set toggletest toggle_c 0
+  setting get myvar toggletest toggle_c
+  testlib fail_unless myvar equalto 0
+  testlib end
+}

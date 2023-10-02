@@ -1,0 +1,286 @@
+block load
+{
+  es_xdoblock corelib/score/score_register
+}
+
+block score_register
+{
+  // variables used by score
+  es_xsetinfo _score_command 0
+  es_xsetinfo _score_target 0
+  es_xsetinfo _score_userid 0
+  es_xsetinfo _score_param 0
+  es_xsetinfo _score_count 0
+  es_xsetinfo _score_index 0
+  es_xsetinfo _score_temp 0
+  es_xsetinfo _score_temp2 0
+  es_xsetinfo _score_temp3 0
+  // check if score exists
+  es_xexists _exists command score
+  if (server_var(_exists) = 0) do
+  {
+    es_xregcmd score corelib/score/score "Alter/retrieve a player's score"
+  }
+}
+
+block score
+{
+  es_xsetinfo _score_temp 0
+  es_xgetargc _score_count
+  es_xmath _score_count - 1
+  es es_xif (server_var(_score_count) >= 1) do
+  {
+    es_xgetargv _score_command 1
+  }
+  es es_xif (server_var(_score_count) >= 2) do
+  {
+    es_xgetargv _score_target 2
+  }
+  es es_xif (server_var(_score_count) >= 3) do
+  {
+    es_xgetargv _score_param 3
+  }
+  es es_xif (server_var(_score_count) < 3) do
+  {
+    echo Syntax: score <command> <userid> <param>
+    es_xsetinfo _score_temp 1
+  }
+  es es_xif (server_var(_score_count) = 3) do
+  {
+    es es_xif (server_var(_score_command) = "(") do
+    {
+      es es_xif (server_var(_score_target) = null) do
+      {
+        es es_xif (server_var(_score_param) = ")") do
+        {
+          echo Syntax: score <command> <userid> <param>
+          es_xsetinfo _score_temp 1
+        }
+      }
+    }
+  }
+  es es_xif (server_var(_score_temp) = 0) do
+  {
+    es es_xif (server_var(_score_command) = get) do
+    {
+      es es_xif (server_var(_score_param) = #t) do
+      {
+        es_xsetinfo _score_team 2
+        es_xdoblock corelib/score/score_get_team
+        es_xsetinfo _score_temp 1
+      }
+      es es_xif (server_var(_score_param) = #ct) do
+      {
+        es_xsetinfo _score_team 3
+        es_xdoblock corelib/score/score_get_team
+        es_xsetinfo _score_temp 1
+      }
+    }
+    es es_xif (server_var(_score_command) = set) do
+    {
+      es es_xif (server_var(_score_target) = #t) do
+      {
+        es_xsetinfo _score_team 2
+        es_xdoblock corelib/score/score_set_team
+        es_xsetinfo _score_temp 1
+      }
+      es es_xif (server_var(_score_target) = #ct) do
+      {
+        es_xsetinfo _score_team 3
+        es_xdoblock corelib/score/score_set_team
+        es_xsetinfo _score_temp 1
+      }
+    }
+    es es_xif (server_var(_score_command) = add) do
+    {
+      es es_xif (server_var(_score_target) = #t) do
+      {
+        es_xsetinfo _score_team 2
+        es_xdoblock corelib/score/score_add_team
+        es_xsetinfo _score_temp 1
+      }
+      es es_xif (server_var(_score_target) = #ct) do
+      {
+        es_xsetinfo _score_team 3
+        es_xdoblock corelib/score/score_add_team
+        es_xsetinfo _score_temp 1
+      }
+    }
+    es es_xif (server_var(_score_command) = del) do
+    {
+      es es_xif (server_var(_score_target) = #t) do
+      {
+        es_xsetinfo _score_team 2
+        es_xdoblock corelib/score/score_del_team
+        es_xsetinfo _score_temp 1
+      }
+      es es_xif (server_var(_score_target) = #ct) do
+      {
+        es_xsetinfo _score_team 3
+        es_xdoblock corelib/score/score_del_team
+        es_xsetinfo _score_temp 1
+      }
+    }
+  }
+  es es_xif (server_var(_score_temp) = 0) do
+  {
+    es es_xif (server_var(_score_command) != get) do
+    {
+      es es_xgetuserid _score_userid server_var(_score_target)
+    }
+    es es_xif (server_var(_score_command) = get) do
+    {
+      es es_xgetuserid _score_userid server_var(_score_param)
+    }
+    es es_xif (server_var(_score_userid) = 0) do
+    {
+      echo score: Invalid target
+      es_xsetinfo _score_temp 1
+    }
+  }
+  es es_xif (server_var(_score_temp) = 0) do
+  {
+    es es_xif (server_var(_score_command) = get) do
+    {
+      es_xdoblock corelib/score/score_get
+      es_xsetinfo _score_temp 1
+    }
+    es es_xif (server_var(_score_command) = set) do
+    {
+      es_xdoblock corelib/score/score_set
+      es_xsetinfo _score_temp 1
+    }
+    es es_xif (server_var(_score_command) = add) do
+    {
+      es_xdoblock corelib/score/score_add
+      es_xsetinfo _score_temp 1
+    }
+    es es_xif (server_var(_score_command) = del) do
+    {
+      es_xdoblock corelib/score/score_del
+      es_xsetinfo _score_temp 1
+    }
+  }
+  es es_xif (server_var(_score_temp) = 0) do
+  {
+    echo Syntax: score <command> <userid> <param>
+  }
+}
+
+block score_get
+{
+  es es_xcreateplayerlist score_list server_var(_score_userid)
+  es es_xsetinfo server_var(_score_target) 0
+  es es_xkeygetvalue server_var(_score_target) score_list server_var(_score_userid) kills
+  es_xkeygroupdelete score_list
+}
+
+block score_set
+{
+  es es_xcreateplayerlist _score_list server_var(_score_userid)
+  es_xsetinfo _score_temp 0
+  es es_xkeygetvalue _score_temp _score_list server_var(_score_userid) kills
+  es_xkeygroupdelete _score_list
+  es_xcopy _tempcore _score_param
+  es es_xmath _tempcore - server_var(_score_temp)
+  es es_xfire server_var(_score_userid) game_score kill
+  es_xsetinfo _score_temp 0
+  es es_xgive server_var(_score_userid) game_score
+  es es_xfire server_var(_score_userid) game_score addoutput "spawnflags 1"
+  es es_xformat _score_temp "points %1" server_var(_tempcore)
+  es es_xfire server_var(_score_userid) game_score addoutput server_var(_score_temp)
+  es es_xfire server_var(_score_userid) game_score ApplyScore
+}
+
+block score_add
+{
+  es es_xfire server_var(_score_userid) game_score kill
+  es_xcopy _score_temp _score_param
+  es_xmath _score_temp + 1
+  es es_xif (server_var(_score_temp) = server_var(_score_param)) do
+  {
+    es_xsetinfo _score_param 0
+  }
+  es es_xif (server_var(_score_param) > 0) do
+  {
+    es_xsetinfo _score_temp 0
+    es es_xgive server_var(_score_userid) game_score
+    es es_xfire server_var(_score_userid) game_score addoutput "spawnflags 1"
+    es es_xformat _score_temp "points %1" server_var(_score_param)
+    es es_xfire server_var(_score_userid) game_score addoutput server_var(_score_temp)
+    es es_xfire server_var(_score_userid) game_score ApplyScore
+  }
+}
+
+block score_del
+{
+  es es_xfire server_var(_score_userid) game_score kill
+  es_xcopy _score_temp _score_param
+  es_xmath _score_temp + 1
+  es es_xif (server_var(_score_temp) = server_var(_score_param)) do
+  {
+    es_xsetinfo _score_param 0
+  }
+  es es_xif (server_var(_score_param) > 0) do
+  {
+    es_xsetinfo _score_temp 0
+    es es_xgive server_var(_score_userid) game_score
+    es es_xfire server_var(_score_userid) game_score addoutput "spawnflags 1"
+    es es_xformat _score_temp "points -%1" server_var(_score_param)
+    es es_xfire server_var(_score_userid) game_score addoutput server_var(_score_temp)
+    es es_xfire server_var(_score_userid) game_score ApplyScore
+  }
+}
+
+block score_get_team
+{
+  es_xsetinfo _score_temp 0
+  es_xcreateentitylist _score_templist cs_team_manager
+  es_xforeachkey _score_temp in _score_templist "es_xdoblock corelib/score/score_checkteam"
+  es_xkeygroupdelete _score_templist
+  es es_xsetinfo server_var(_score_target) 0
+  es es_xgetindexprop server_var(_score_target) server_var(_score_index) "CCSTeam.baseclass.m_iScore"
+}
+
+block score_set_team
+{
+  es_xsetinfo _score_temp 0
+  es_xcreateentitylist _score_templist cs_team_manager
+  es_xforeachkey _score_temp in _score_templist "es_xdoblock corelib/score/score_checkteam"
+  es_xkeygroupdelete _score_templist
+  es es_xsetindexprop server_var(_score_index) "CCSTeam.baseclass.m_iScore" server_var(_score_param)
+}
+
+block score_add_team
+{
+  es_xsetinfo _score_temp 0
+  es_xsetinfo _score_temp3 0
+  es_xcreateentitylist _score_templist cs_team_manager
+  es_xforeachkey _score_temp in _score_templist "es_xdoblock corelib/score/score_checkteam"
+  es_xkeygroupdelete _score_templist
+  es es_xgetindexprop _score_temp3 server_var(_score_index) "CCSTeam.baseclass.m_iScore"
+  es es_xmath _score_temp3 + server_var(_score_param)
+  es es_xsetindexprop server_var(_score_index) "CCSTeam.baseclass.m_iScore" server_var(_score_temp3)
+}
+
+block score_del_team
+{
+  es_xsetinfo _score_temp 0
+  es_xsetinfo _score_temp3 0
+  es_xcreateentitylist _score_templist cs_team_manager
+  es_xforeachkey _score_temp in _score_templist "es_xdoblock corelib/score/score_checkteam"
+  es_xkeygroupdelete _score_templist
+  es es_xgetindexprop _score_temp3 server_var(_score_index) "CCSTeam.baseclass.m_iScore"
+  es es_xmath _score_temp3 - server_var(_score_param)
+  es es_xsetindexprop server_var(_score_index) "CCSTeam.baseclass.m_iScore" server_var(_score_temp3)
+}
+
+block score_checkteam
+{
+  es_xsetinfo _score_temp2 0
+  es es_xgetindexprop _score_temp2 server_var(_score_temp) "CCSTeam.baseclass.m_iTeamNum"
+  es es_xif (server_var(_score_temp2) = server_var(_score_team)) do
+  {
+    es_xcopy _score_index _score_temp
+  }
+}

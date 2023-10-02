@@ -1,0 +1,48 @@
+// getplayercount command v0.1
+// Submitted by [NATO]Hunter
+//
+// getplayercount allows you to count players by a filter provided by foreach
+// syntax:
+// getplayercount <return-var> <filter>
+// Originally submitted by [NATO]Hunter
+
+block load
+{
+  es_xdoblock corelib/getplayercount/getplayercount_register
+}
+
+block getplayercount_register
+{
+  // variables used by getplayercount
+  es_xset _getplayercount_var 0
+  es_xset _getplayercount_filter 0
+  es_xset _getplayercount_player 0
+  // check to see if getplayercount exists
+  es_xexists _exists command getplayercount
+  if (server_var(_exists) = 0) do
+  {
+    es_xregcmd getplayercount corelib/getplayercount/getplayercount "Counts players based on a foreach filter"
+  }
+}
+
+block getplayercount
+{
+  es_xgetargv _getplayercount_var 1
+  ifx true(_getplayercount_var) do
+  {
+    es_xgetargv _getplayercount_filter 2
+    ifx true(_getplayercount_filter) do
+    {
+      es_set server_var(_getplayercount_var) 0
+      es foreach player _getplayercount_player server_var(_getplayercount_filter) "es_math server_var(_getplayercount_var) + 1"
+    }
+    else do
+    {
+      es_xdbgmsg 0 getplayercount: Invalid arguments for getplayercount. Syntax: getplayercount <return-var> <filter>
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 getplayercount: Invalid arguments for getplayercount. Syntax: getplayercount <return-var> <filter>
+  }
+}

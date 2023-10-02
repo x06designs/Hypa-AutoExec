@@ -1,0 +1,202 @@
+// Average
+// v0.51
+//
+// Submitted by cagemonkey
+// Uses #round, #floor and #ceiling to truncate output if desired
+// #round is the traditional if remainder >= 5 then round up method
+// #floor always rounds down
+// #ceiling always rounds up
+// More info available at http://en.wikipedia.org/wiki/Rounding
+
+block load
+{
+	es_xdoblock corelib/average/average_register
+}
+
+// Average syntax:
+// average <var> [type] numbers to average seperated by spaces
+// Required: <var> is the variable the end result will be stored in
+// Optional: [type] can be #round, #floor or #ceiling depending on how you want the number truncated
+// Example: average test #floor 3 3 6 3
+// The average is 3.75, but #round results = 4, #floor results = 3 and #ceiling results = 4
+
+block average_register
+{
+  // variables used by average
+	es_xset _average_arg_count 0
+	es_xset _average_arg_counter 0
+	es_xset _average_tmp_arg 0
+	es_xset _average_tmp_var 0
+	// if the average command isn't already registered
+	es_xexists _exists command average
+	if (server_var(_exists) = 0) do
+	{
+		es_xregcmd average corelib/average/average "Averages numbers and can round the output Syntax: average <var> [type] 1 2 3 etc"
+	}
+}
+
+
+block average
+{
+	// Initialize totalizer to 0
+	es_xset _average_tmp_total 0
+	
+	// Get argument count and set counter
+	es_xgetargc _average_arg_count
+	es_xcopy _average_arg_counter _average_arg_count
+
+	// Remove the variable given from the total argument count
+	es_xmath _average_arg_count - 2 // Total numbers to average
+	es_xmath _average_arg_counter - 1 // Last number given to average
+
+	// Check the syntax
+	if (server_var(_average_arg_count) < 3) do
+	{
+		es_xgetargv _average_tmp_arg 2
+		if ("#" in server_var(_average_tmp_arg)) do
+		{
+			es_dbgmsg 0 "average: Not enough arguments to average. Syntax: average <var> [type] <number> <number> <etc>"
+		}
+		else do
+		{
+			if (server_var(_average_arg_count) < 2) do
+			{
+				es_dbgmsg 0 "average: Not enough arguments to average. Syntax: average <var> [type] <number> <number> <etc>"
+			}
+			else do
+			{
+				// Setup user defined storage variable for finished average
+				es_xgetargv _average_tmp_var 1
+				es_set server_var(_average_tmp_var) 0
+
+				// Average loop
+				es_xdoblock corelib/average/average_loop
+			}
+		}
+	}
+	else do
+	{
+		// Setup user defined storage variable for finished average
+		es_xgetargv _average_tmp_var 1
+		es_set server_var(_average_tmp_var) 0
+
+		// Average loop
+		es_xdoblock corelib/average/average_loop
+	}
+}
+
+
+block average_loop
+{
+	if (server_var(_average_arg_counter) > 2) do
+	{
+		// Get totals to average
+		es_getargv _average_tmp_arg server_var(_average_arg_counter)
+		es_math _average_tmp_total + server_var(_average_tmp_arg)
+		es_xmath _average_arg_counter - 1
+		es_xdoblock corelib/average/average_loop
+	}
+	else do
+	{
+		es_getargv _average_tmp_arg server_var(_average_arg_counter)
+		if (server_var(_average_tmp_arg) = "#floor") do
+		{
+			// Account for losing one more argument
+			es_xmath _average_arg_count - 1
+
+			// complete average
+			es_math _average_tmp_total / server_var(_average_arg_count)
+
+			// #floor code
+			es_xset _average_tmp_floor1 0
+			es_token _average_tmp_floor1 server_var(_average_tmp_total) 1 .
+
+			// Set final variable
+			es_copy server_var(_average_tmp_var) _average_tmp_floor1
+			if (server_var(_average_tmp_total) < 0) then es_xmath _average_tmp_var - 1
+		}
+		else do
+		{
+			if (server_var(_average_tmp_arg) = "#ceiling") do
+			{
+				// Account for losing one more argument
+				es_xmath _average_arg_count - 1
+
+				// complete average
+				es_math _average_tmp_total / server_var(_average_arg_count)
+
+				// #ceiling code
+				es_xset _average_tmp_ceiling1 0
+				es_xset _average_tmp_ceiling2 0
+				es_token _average_tmp_ceiling1 server_var(_average_tmp_total) 1 .
+				es_token _average_tmp_ceiling2 server_var(_average_tmp_total) 2 .
+				if (server_var(_average_tmp_ceiling2) > 0) do
+				{
+					if (server_var(_average_tmp_total) < 0) do
+					{
+						es_xmath _average_tmp_ceiling1 - 1
+					}
+					else do
+					{
+						es_xmath _average_tmp_ceiling1 + 1
+					}
+					// Set final variable
+					es_copy server_var(_average_tmp_var) _average_tmp_ceiling1
+				}
+				else do
+				{
+					// No rounding needed
+					es_copy server_var(_average_tmp_var) _average_tmp_total
+				}
+			}
+			else do
+			{
+				if (server_var(_average_tmp_arg) = "#round") do
+				{
+					// Account for losing one more argument
+					es_xmath _average_arg_count - 1
+
+					// complete average
+					es_math _average_tmp_total / server_var(_average_arg_count)
+
+					// #round code
+					es_xset _average_tmp_round1 0
+					es_xset _average_tmp_round2 0
+					es_xset _average_tmp_round3 0
+					es_token _average_tmp_round1 server_var(_average_tmp_total) 1 .
+					es_token _average_tmp_round2 server_var(_average_tmp_total) 2 .
+
+					if (server_var(_average_tmp_round2) != 0) do
+					{
+						// After splitting the variable, we subtract the whole number and round based on the fraction alone
+						es_xcopy _average_tmp_round3 _average_tmp_total
+						es_math _average_tmp_round3 - server_var(_average_tmp_round1)
+						if (server_var(_average_tmp_round3) < 0) do
+						{
+							if (server_var(_average_tmp_round3) =< -0.5) then es_xmath _average_tmp_round1 - 1
+						}
+						if (server_var(_average_tmp_round3) > 0) do
+						{
+							if (server_var(_average_tmp_round3) => 0.5) then es_xmath _average_tmp_round1 + 1
+						}
+						// Set final variable
+						es_copy server_var(_average_tmp_var) _average_tmp_round1
+					}
+					else do
+					{
+						// No rounding needed
+						es_copy server_var(_average_tmp_var) _average_tmp_total
+					}
+				}
+				else do
+				{
+					// No #round #floor or #ceiling argument so we finish up
+					// Add the last variable and finish
+					es_math _average_tmp_total + server_var(_average_tmp_arg)
+					es_math _average_tmp_total / server_var(_average_arg_count)
+					es_copy server_var(_average_tmp_var) _average_tmp_total
+				}
+			}
+		}
+	}
+}

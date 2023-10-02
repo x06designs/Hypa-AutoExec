@@ -1,0 +1,940 @@
+// exp - corelib subscript - by Chun
+//
+// Syntax: exp <command-string>
+//
+//    * server_var(<variable>)
+//    * sv(<variable>)
+//    * event_var(<variable>)
+//    * ev(<variable>)
+//    * nq(<string>)
+//    * eq(<string>)
+//    * cond(<value1> <operator> <value2>)
+//    * ins(<0/1> <string> <string>)
+//    * define(<variable>)
+//    * userid(<identifying-info>)
+//    * steamid(<userid>)
+//    * username(<userid>)
+//    * rand(<min> <max>)
+//    * strlen(<string>)
+//    * token(<string> <token#> [seperator-character])
+//    * string(<operator> <value> <value2>)
+//    * keyval([keygroup] <key> <valuename>)
+//    * math(<number1> <operator> [number2])
+//    * mathparse(<math-expression>)
+//    * exists(<type> <info>)
+//    * indexprop(<index> <property>)
+//    * entityindex(<entity-name>)
+//    * playerinfo(<userid> <property>)
+//    * playerget(<subcommand> <parameters>)
+//    * playerprop(<userid> <property>)
+//    * playerxloc(<userid>)
+//    * playeryloc(<userid>)
+//    * playerzloc(<userid>)
+//    * textlib(<subcommand> <parameters>)
+//    * isbot(<userid>)
+//    * isnumerical(<string>)
+//    * botname(<userid>)
+//    * isnull(<variable>)
+//    * uniqueid(<userid>)
+//    * average([type] <num1 num2 numN>)
+//    * playervar(<userid> <variable-name>)
+//    * randplayer(<team-index>)
+
+block load
+{
+   es_xset _tempcore 0
+   es_xexists _tempcore command exp
+   ifx false(_tempcore) do
+   {
+      es_xregcmd exp corelib/exp/exp "extended expansion"
+   }
+   es_xset _tempcore 0
+   es_xexists _tempcore command uxp
+   ifx false(_tempcore) do
+   {
+      es_xregcmd uxp corelib/exp/uxp "extended user expansion"
+   }
+   es_xset _tempcore 0
+   es_xexists _tempcore command uxp_reg
+   ifx false(_tempcore) do
+   {
+      es_xregcmd uxp_reg corelib/exp/uxpreg "extended user expansion registration"
+   }
+   es_xset _tempcore 0
+   es_xexists _tempcore command _expstr
+   ifx false(_tempcore) do
+   {
+      es_xregcmd _expstr corelib/exp/expstr "internal exp parsing command"
+   }
+   es_xset _exp_temp1 0
+   es_xset _exp_temp2 0
+   testcase qcreate corelib exptest "Tests tokenfrq"
+   testcase addtest exptest exptest corelib/exp/test_exp "Exp Corelib Command Test"
+   testcase addtest exptest uxptest corelib/exp/test_uxp "Uxp Corelib Command Test"
+   es_xkeygroupcreate _uxp_functions
+   es_xkeycreate _uxp_functions _settings
+   es_xkeysetvalue _uxp_functions _settings funcs "nq|eq|server_var|event_var|sv|ev|cond|average|botname|define|entityindex|exists|indexprop|ins|isbot|isnumerical|isnull|keyval|math|mathparse|playerinfo|playerget|playerprop|playervar|playerxloc|playeryloc|playerzloc|rand|randplayer|steamid|string|strlen|textlib|token|uniqueid|userid|username"
+   es_xkeysetvalue _uxp_functions _settings regex 0
+   es_xkeysetvalue _uxp_functions _settings count 0
+}
+
+block unload
+{
+   es_xkeygroupdelete _uxp_functions
+}
+
+block uxpreg
+{
+   es_xset _uxp_argc 0
+   es_xgetargc _uxp_argc
+   if (server_var(_uxp_argc) > 1) do
+   {
+      es_xset _tempcore 0
+      es_xgetargv _tempcore 1
+      es_xformatv _tempcore "corelib/exp/uxp_%1" _tempcore
+      es_xset _uxp_temp 0
+      es_exists _uxp_temp block server_var(_tempcore)
+      ifx true(_uxp_temp) do
+      {
+         es_doblock server_var(_tempcore)
+      }
+      es_xelse do
+      {
+         es_xdbgmsg 0 uxp_reg : invalid sub-command
+      }
+   }
+   es_xelse do
+   {
+      es_xdbgmsg 0 Syntax : uxp_reg <sub-command> <function> <commandstring>
+   }
+}
+
+block uxp_create
+{
+   if (server_var(_uxp_argc) > 3) do
+   {
+      es_xset _uxp_func 0
+      es_xgetargv _uxp_func 2
+      es_xset _tempcore 0
+      es_regex match _tempcore "^[a-z_]*$" server_var(_uxp_func)
+      if (server_var(_tempcore) = -1) do
+      {
+         es_xdbgmsg 0 uxp_reg : invalid characters in function name
+      }
+      es_xelse do
+      {
+         es_xset _tempcore 0
+         es_regex match _tempcore "^(nq|eq|server_var|event_var|sv|ev|cond|average|botname|define|entityindex|exists|indexprop|ins|isbot|isnumerical|isnull|keyval|math|mathparse|playerinfo|playerget|playerprop|playervar|playerxloc|playeryloc|playerzloc|rand|randplayer|steamid|string|strlen|textlib|token|uniqueid|userid|username)$" server_var(_uxp_func)
+         if (server_var(_tempcore) = -1) do
+         {
+            es_xset _tempcore 0
+            es_exists _tempcore key _uxp_functions server_var(_uxp_func)
+            ifx true(_tempcore) do
+            {
+               es_xdbgmsg 0 uxp_reg : function already registered
+            }
+            es_xelse do
+            {
+               es_xset _uxp_cmds 0
+               es_xgetargv _uxp_cmds 3
+               if ("%var" in server_var(_uxp_cmds)) do
+               {
+                  es_xstring _uxp_cmds replace "%var" _uxp_result
+                  es_xset _uxp_parse "_exp_null;"
+                  if ("%1" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 1; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_quotemark2 $_uxp_quote; es_xstring _uxp_cmds replacev eventscripts_quote _uxp_quotemark2; es_formatv _uxp_cmds server_var(_uxp_cmds) _tempcore; es_xstring _uxp_cmds replacev _uxp_quotemark2 eventscripts_quote;" _uxp_parse
+                  }
+                  if ("%2" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 2; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %2; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%3" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 3; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %3; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%4" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 4; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %4; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%5" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 5; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %5; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%6" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 6; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %6; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%7" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 7; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %7; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%8" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 8; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %8; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%9" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargv _tempcore 9; es_xformatv _tempcore $exp_replace_me eventscripts_quote _tempcore; es_xset _uxp_temp %9; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%args" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargs _tempcore; es_xset _uxp_temp %args; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  if ("%argc" in server_var(_uxp_cmds)) do
+                  {
+                     es_xformatv _uxp_parse "%1 es_xset _tempcore 0; es_xgetargc _tempcore; es_xset _uxp_temp %argc; es_xstring _uxp_cmds replacev _uxp_temp _tempcore;" _uxp_parse
+                  }
+                  es_xstring _uxp_parse replace $exp_replace_me %1%2%1
+                  es_keycreate _uxp_functions server_var(_uxp_func)
+                  es_keysetvalue _uxp_functions server_var(_uxp_func) cmds server_var(_uxp_cmds)
+                  es_keysetvalue _uxp_functions server_var(_uxp_func) parse server_var(_uxp_parse)
+                  es_xset _uxp_funcs 0
+                  es_xkeygetvalue _uxp_funcs _uxp_functions _settings funcs
+                  es_xformatv _uxp_funcs "%1|%2" _uxp_funcs _uxp_func
+                  es_keysetvalue _uxp_functions _settings funcs server_var(_uxp_funcs)
+                  es_xset _uxp_regex 0
+                  es_xformatv _uxp_regex "(`[^`]*`|[^`]*)*((%1)\(([^)`(]*|`[^`]*`)*\))(`[^`]*`|[^`]*)*" _uxp_funcs
+                  es_keysetvalue _uxp_functions _settings regex server_var(_uxp_regex)
+                  es_xset _tempcore 0
+                  es_xkeygetvalue _tempcore _uxp_functions _settings count
+                  es_xmath _tempcore + 1
+                  es_keysetvalue _uxp_functions _settings count server_var(_tempcore)
+               }
+               es_xelse do
+               {
+                  es_xdbgmsg 0 uxp_reg : %var must be included in commandstring
+               }
+            }
+         }
+         es_xelse do
+         {
+            es_xdbgmsg 0 uxp_reg : this function is reserved
+         }
+      }
+   }
+   es_xelse do
+   {
+      es_xdbgmsg 0 Syntax : uxp_reg create <function> <commandstring>
+   }
+}
+
+block uxp_delete
+{
+   if (server_var(_uxp_argc) > 2) do
+   {
+      es_xset _uxp_func 0
+      es_xgetargv _uxp_func 2
+      if (server_var(_uxp_func) = _settings) do
+      {
+         es_xdbgmsg 0 uxp_reg : this funtion is reserved
+      }
+      es_xelse do
+      {
+         es_xset _tempcore 0
+         es_exists _tempcore key _uxp_functions server_var(_uxp_func)
+         ifx true(_tempcore) do
+         {
+            es_keydelete _uxp_functions server_var(_uxp_func)
+            es_xset _uxp_funcs 0
+            es_xkeygetvalue _uxp_funcs _uxp_functions _settings funcs
+            es_xformatv _uxp_func "|%1" _uxp_func
+            es_xstring _uxp_funcs replacev _uxp_func
+            es_keysetvalue _uxp_functions _settings funcs server_var(_uxp_funcs)
+            es_xkeygetvalue _tempcore _uxp_functions _settings count
+            es_xmath _tempcore - 1
+            ifx false(_tempcore) do
+            {
+               es_xkeysetvalue _uxp_functions _settings regex 0
+               es_xkeysetvalue _uxp_functions _settings count 0
+            }
+            es_xelse do
+            {
+               es_keysetvalue _uxp_functions _settings count server_var(_tempcore)
+            }
+         }
+      }
+   }
+   es_xelse do
+   {
+      es_xdbgmsg 0 Syntax : uxp_reg delete <function>
+   }
+}
+
+block uxp_status
+{
+   if (server_var(_uxp_argc) > 3) do
+   {
+      es_xset _uxp_func 0
+      es_xgetargv _uxp_func 3
+      es_xset _uxp_var 0
+      es_xgetargv _uxp_var 2
+      es_xset _tempcore 0
+      es_exists _tempcore key _uxp_functions server_var(_uxp_func)
+      es_set server_var(_uxp_var) server_var(_tempcore)
+   }
+   es_xelse do
+   {
+      es_xdbgmsg 0 Syntax : uxp_reg status <variable> <function>
+   }
+}
+
+block uxp
+{
+   es_xset _uxp_string 0
+   es_xgetargs _uxp_string
+   ifx true(_uxp_string) do
+   {
+      es_xset _uxp_cmd 0
+      es_xset _uxp_quotemark `
+      es_xset _uxp_quotemark2 $_uxp_quote
+      es_xstring _uxp_string replacev _uxp_quotemark _uxp_quotemark2
+      alias _exp_null
+      es_xdoblock corelib/exp/uxpparse
+      es_xstring _uxp_string replacev _uxp_quotemark2 _uxp_quotemark
+      es_xcommandv _uxp_string
+   }
+}
+
+
+block uxpparse
+{
+   es_xset _uxp_section 0
+   es_xset _uxp_regex 0
+   es_xkeygetvalue _uxp_regex _uxp_functions _settings regex
+   ifx true(_uxp_regex) do
+   {
+      es_regex matchformat _uxp_section server_var(_uxp_regex) server_var(_uxp_string) %2
+   }
+   es_xelse do
+   {
+      es_regex matchformat _uxp_section "(`[^`]*`|[^`]*)*((nq|eq|server_var|event_var|sv|ev|cond|average|botname|define|entityindex|exists|indexprop|ins|isbot|isnumerical|isnull|keyval|math|mathparse|playerinfo|playerget|playerprop|playervar|playerxloc|playeryloc|playerzloc|rand|randplayer|steamid|string|strlen|textlib|token|uniqueid|userid|username)\(([^)`(]*|`[^`]*`)*\))(`[^`]*`|[^`]*)*" server_var(_uxp_string) %2
+   }
+   ifx true(_uxp_section) do
+   {
+      es_xset _uxp_result 0
+      es_xset _uxp_val 0
+      es_regex matchformat _uxp_val "^[a-z_]*\((.*)\)$" server_var(_uxp_section) %1
+      ifx true(_uxp_val) do
+      {
+         if (` in server_var(_uxp_val)) do
+         {
+            es_xstring _uxp_val replacev _uxp_quotemark eventscripts_quote
+            es_xstring _uxp_section replacev _uxp_quotemark eventscripts_quote
+         }
+         es_xstring _uxp_val replacev _uxp_quotemark2 _uxp_quotemark
+         es_xset _uxp_cmd 0
+         es_token _uxp_cmd server_var(_uxp_section) 1 (
+         es_xset _tempcore 0
+         es_regex match _tempcore "^(nq|eq|server_var|event_var|sv|ev|cond|average|botname|define|entityindex|exists|indexprop|ins|isbot|isnumerical|isnull|keyval|match|math|mathparse|playerinfo|playerget|playerprop|playervar|playerxloc|playeryloc|playerzloc|rand|randplayer|steamid|string|strlen|token|tokenfrq|uniqueid|userid|username)$" server_var(_uxp_cmd)
+         if (server_var(_tempcore) = -1) do
+         {
+            es_xset _uxp_cmds 0
+            es_keygetvalue _uxp_cmds _uxp_functions server_var(_uxp_cmd) cmds
+            es_xstring _uxp_cmds replace "\%" $exp_replace_me
+            es_xset _uxp_parse 0
+            es_keygetvalue _uxp_parse _uxp_functions server_var(_uxp_cmd) parse
+            es_xformatv _tempcore "_expstr %1" _uxp_val
+            es_xset _exp_strtype uxp
+            es_xcommandv _tempcore
+            es_xstring _uxp_cmds replace $exp_replace_me %
+            es_xcommandv _uxp_cmds
+            es_xset _uxp_cmd 0
+         }
+         es_xelse do
+         {
+            es_xset _exp_val 0
+            es_xcopy _exp_val _uxp_val
+            es_xset _exp_result 0
+            es_xset _tempcore 0
+            es_xformatv _tempcore "corelib/exp/exp_%1" _uxp_cmd
+            es_doblock server_var(_tempcore)
+            es_xcommandv _exp_val
+            es_xset _uxp_result 0
+            es_xcopy _uxp_result _exp_result
+         }
+         if (` in server_var(_uxp_result)) do
+         {
+            es_xstring _uxp_result replacev _uxp_quotemark _uxp_quotemark2
+            es_xstring _uxp_result replacev eventscripts_quote _uxp_quotemark2
+         }
+      }
+      if (server_var(_uxp_cmd) != nq) do
+      {
+         es_xformatv _uxp_result %1%2%1 eventscripts_quote _uxp_result
+      }
+      es_xstring _uxp_string replacev _uxp_section _uxp_result
+      es_xdoblock corelib/exp/uxpparse
+   }
+}
+
+block exp
+{
+   es_xset _exp_string 0
+   es_xgetargs _exp_string
+   ifx true(_exp_string) do
+   {
+      es_xset _exp_cmd 0
+      es_xset _exp_quotemark `
+      es_xset _exp_quotemark2 $_exp_quote
+      es_xstring _exp_string replacev _exp_quotemark _exp_quotemark2
+      es_xstring _exp_string replace "\(" $_exp_leftbracket
+      es_xstring _exp_string replace "\)" $_exp_rightbracket
+      alias _exp_null
+      es_xdoblock corelib/exp/expparse
+      es_xstring _exp_string replacev _exp_quotemark2 _exp_quotemark
+      es_xstring _exp_val replace $_exp_leftbracket "("
+      es_xstring _exp_val replace $_exp_rightbracket ")"
+      es_xcommandv _exp_string
+   }
+}
+
+block expparse
+{
+   es_xset _exp_section 0
+   es_regex matchformat _exp_section "(`[^`]*`|[^`]*)*((nq|eq|server_var|event_var|sv|ev|cond|average|botname|define|entityindex|exists|indexprop|ins|isbot|isnumerical|isnull|keyval|math|mathparse|playerinfo|playerget|playerprop|playervar|playerxloc|playeryloc|playerzloc|rand|randplayer|steamid|string|strlen|textlib|token|uniqueid|userid|username)\(([^)`(]*|`[^`]*`)*\))(`[^`]*`|[^`]*)*" server_var(_exp_string) %2
+   ifx true(_exp_section) do
+   {
+      es_xset _exp_result 0
+      es_xset _exp_val 0
+      es_regex matchformat _exp_val "^[a-z_]*\((.*)\)$" server_var(_exp_section) %1
+      ifx true(_exp_val) do
+      {
+         if (` in server_var(_exp_val)) do
+         {
+            es_xstring _exp_val replacev _exp_quotemark eventscripts_quote
+            es_xstring _exp_section replacev _exp_quotemark eventscripts_quote
+         }
+         es_xstring _exp_val replace $_exp_leftbracket "("
+         es_xstring _exp_val replace $_exp_rightbracket ")"
+         es_xstring _exp_val replacev _exp_quotemark2 _exp_quotemark
+         es_xset _exp_cmd 0
+         es_token _exp_cmd server_var(_exp_section) 1 (
+         es_xset _tempcore 0
+         es_xformatv _tempcore "corelib/exp/exp_%1" _exp_cmd
+         es_doblock server_var(_tempcore)
+         es_xcommandv _exp_val
+         if (` in server_var(_exp_result)) do
+         {
+            es_xstring _exp_result replacev _exp_quotemark _exp_quotemark2
+            es_xstring _exp_result replacev eventscripts_quote _exp_quotemark2
+         }
+      }
+      if (server_var(_exp_cmd) != nq) do
+      {
+         es_xformatv _exp_result %1%2%1 eventscripts_quote _exp_result
+      }
+      es_xelse do
+      {
+         es_xstring _exp_result replace "(" "$_exp_leftbracket"
+         es_xstring _exp_result replace ")" "$_exp_rightbracket"
+      }
+      es_xstring _exp_string replacev _exp_section _exp_result
+      es_xdoblock corelib/exp/expparse
+   }
+}
+
+block exp_textlib
+{
+   es_xset _exp_strtype textlib
+   es_xformatv _exp_result "_expstr %1" _exp_val
+   es_xcommandv _exp_result
+}
+
+block exp_math
+{
+   es_xset _exp_strtype math
+   es_xformatv _exp_result "_expstr %1" _exp_val
+   es_xcommandv _exp_result
+   es_xformatv _exp_val "es_xmath _exp_result %1" _exp_val
+   es_xsetinfo eventscripts_lasterror 0
+   es_xcommandv _exp_val
+   if (server_var(eventscripts_lasterror) != 0) do
+   {
+      es_xset _exp_result 0
+   }
+   es_xset _exp_val _exp_null
+}
+
+block exp_string
+{
+   es_xset _exp_strtype string
+   es_xformatv _exp_result "_expstr %1" _exp_val
+   es_xcommandv _exp_result
+   es_xformatv _exp_val "es_xstring _exp_result %1" _exp_val
+   es_xsetinfo eventscripts_lasterror 0
+   es_xcommandv _exp_val
+   if (server_var(eventscripts_lasterror) != 0) do
+   {
+      es_xset _exp_result 0
+   }
+   es_xset _exp_val _exp_null
+}
+
+block exp_playerget
+{
+   es_xset _exp_strtype playerget
+   es_xformatv _exp_result "_expstr %1" _exp_val
+   es_xcommandv _exp_result
+}
+
+block exp_ins
+{
+   es_xset _exp_strtype ins
+   es_xformatv _exp_result "_expstr %1" _exp_val
+   es_xcommandv _exp_result
+   es_xset _exp_val _exp_null
+}
+
+block exp_define
+{
+   es_xset _exp_strtype define
+   es_xformatv _exp_result "_expstr %1" _exp_val
+   es_xcommandv _exp_result
+   es_xset _exp_val _exp_null
+}
+
+block expstr
+{
+   es_xset _tempcore 0
+   es_xformatv _tempcore "corelib/exp/expstr_%1" _exp_strtype
+   es_doblock server_var(_tempcore)
+}
+
+block expstr_uxp
+{
+   es_xcommandv _uxp_parse
+}
+
+block expstr_math
+{
+   es_xset _exp_argc 0
+   es_xgetargc _exp_argc
+   if (server_var(_exp_argc) > 2) do
+   {
+      es_xset _exp_result 0
+      es_xgetargv _exp_result 1
+      es_xset _exp_val 0
+      es_xgetargv _exp_val 2
+      es_xformatv _exp_val %1%2%1 eventscripts_quote _exp_val
+      if (server_var(_exp_argc) > 3) do
+      {
+         es_xmath _exp_argc - 1
+         es_xset _exp_count 3
+         es_xdoblock corelib/exp/expstrloop
+      }
+   }
+   es_xelse do
+   {
+      es_xset _exp_result 0
+   }
+}
+
+block expstr_string
+{
+   es_xset _exp_argc 0
+   es_xgetargc _exp_argc
+   if (server_var(_exp_argc) > 2) do
+   {
+      es_xset _exp_result 0
+      es_xgetargv _exp_result 1
+      es_xset _exp_val 0
+      es_xgetargv _exp_val 2
+      es_xformatv _exp_val %1%2%1 eventscripts_quote _exp_val
+      if (server_var(_exp_argc) > 3) do
+      {
+         es_xmath _exp_argc - 1
+         es_xset _exp_count 3
+         es_xdoblock corelib/exp/expstrloop
+      }
+   }
+   es_xelse do
+   {
+      es_xset _exp_result 0
+   }
+}
+
+block expstr_playerget
+{
+   es_xset _exp_argc 0
+   es_xgetargc _exp_argc
+   if (server_var(_exp_argc) > 2) do
+   {
+      es_xset _exp_val 0
+      es_xgetargv _exp_val 1
+      if (server_var(_exp_val) = viewangle) do
+      {
+         es_xset _exp_result 0
+      }
+      es_xelse do
+      {
+         es_xformatv _exp_val "playerget %1%2%1 _exp_result" eventscripts_quote _exp_val
+         es_xmath _exp_argc - 1
+         es_xset _exp_count 2
+         es_xdoblock corelib/exp/expstrloop
+      }
+   }
+   es_xelse do
+   {
+      es_xset _exp_result 0
+   }
+}
+
+block expstr_textlib
+{
+   es_xset _exp_argc 0
+   es_xgetargc _exp_argc
+   if (server_var(_exp_argc) > 2) do
+   {
+      es_xset _exp_val 0
+      es_xgetargv _exp_val 1
+      if (server_var(_exp_val) = viewangle) do
+      {
+         es_xset _exp_result 0
+      }
+      es_xelse do
+      {
+         es_xformatv _exp_val "textlib %1%2%1 _exp_result" eventscripts_quote _exp_val
+         es_xmath _exp_argc - 1
+         es_xset _exp_count 2
+         es_xdoblock corelib/exp/expstrloop
+      }
+   }
+   es_xelse do
+   {
+      es_xset _exp_result 0
+   }
+}
+
+block expstr_ins
+{
+   es_xset _exp_argc 0
+   es_xgetargc _exp_argc
+   if (server_var(_exp_argc) > 3) do
+   {
+      es_xset _tempcore 0
+      es_xgetargv _tempcore 1
+      ifx false(_tempcore) do
+      {
+         es_xgetargv _exp_result 2
+      }
+      es_xelse do
+      {
+         if (server_var(_tempcore) = 1) do
+         {
+            es_xgetargv _exp_result 3
+         }
+      }
+   }
+   es_xelse do
+   {
+      es_xset _exp_result 0
+   } 
+}
+
+block expstr_define
+{
+   es_xset _tempcore 0
+   es_xgetargv _tempcore 1
+   ifx true(_tempcore) do
+   {
+      es_set server_var(_tempcore) 0
+   }
+   es_xcopy _exp_result _exp_val
+}
+
+block expstrloop
+{
+   if (server_var(_exp_argc) => server_var(_exp_count)) do
+   {
+      es_xset _tempcore 0
+      es_getargv _tempcore server_var(_exp_count)
+      es_xformatv _exp_val "%1 %2%3%2" _exp_val eventscripts_quote _tempcore
+      es_xmath _exp_count + 1
+      es_xdoblock corelib/exp/expstrloop
+   }
+}
+
+block exp_nq
+{
+   es_xstring _exp_val replacev eventscripts_quote
+   es_xcopy _exp_result _exp_val
+   es_xset _exp_val _exp_null
+}
+
+block exp_eq
+{
+   es_xstring _exp_val replacev eventscripts_quote
+   es_xcopy _exp_result _exp_val
+   es_xset _exp_val _exp_null
+}
+
+block exp_server_var
+{
+   es_xformatv _exp_val "es_xcopy _exp_result %1" _exp_val
+}
+
+block exp_event_var
+{
+   es_xformatv _exp_val "es es_xset _exp_result event_var(%1)" _exp_val
+}
+
+block exp_sv
+{
+   es_xformatv _exp_val "es_xcopy _exp_result %1" _exp_val
+}
+
+block exp_ev
+{
+   es_xformatv _exp_val "es es_xset _exp_result event_var(%1)" _exp_val
+}
+
+block exp_cond
+{
+   es_xformatv _exp_val "es_xif (%1) then es_xset _exp_result 1" _exp_val
+}
+
+block exp_average
+{
+   es_xformatv _exp_val "average _exp_result %1" _exp_val
+}
+
+block exp_botname
+{
+   es_xformatv _exp_val "getbotname _exp_result %1" _exp_val
+}
+
+block exp_entityindex
+{
+   es_xformatv _exp_val "es_xgetentityindex _exp_result %1" _exp_val
+}
+
+block exp_exists
+{
+   es_xformatv _exp_val "es_xexists _exp_result %1" _exp_val
+}
+
+block exp_indexprop
+{
+   es_xformatv _exp_val "es_xgetindexprop _exp_result %1" _exp_val
+}
+
+block exp_isbot
+{
+   es_xformatv _exp_val "es_isbot _exp_result %1" _exp_val
+}
+
+block exp_isnumerical
+{
+   es_xformatv _exp_val "isnumerical _exp_result %1" _exp_val
+}
+
+block exp_isnull
+{
+   es_xformatv _exp_val "isnull _exp_result %1" _exp_val
+}
+
+block exp_keyval
+{
+   es_xformatv _exp_val "es_xkeygetvalue _exp_result %1" _exp_val
+}
+
+block exp_mathparse
+{
+   es_xformatv _exp_val "es_xmathparse _exp_result %1" _exp_val
+}
+
+block exp_playerinfo
+{
+   es_xformatv _exp_val "getplayerinfo _exp_result %1" _exp_val
+}
+
+block exp_playerprop
+{
+   es_xformatv _exp_val "es_xgetplayerprop _exp_result %1" _exp_val
+}
+
+block exp_playervar
+{
+   es_xformatv _exp_val "playervar get _exp_result %1" _exp_val
+}        
+
+block exp_playerxloc
+{
+   es_xformatv _exp_val "es_xgetplayerlocation _exp_result _exp_temp1 _exp_temp2 %1" _exp_val
+}
+
+block exp_playeryloc
+{
+   es_xformatv _exp_val "es_xgetplayerlocation _exp_temp1 _exp_result _exp_temp2 %1" _exp_val
+}
+
+block exp_playerzloc
+{
+   es_xformatv _exp_val "es_xgetplayerlocation _exp_temp1 _exp_temp2 _exp_result %1" _exp_val
+}
+
+block exp_rand
+{
+   es_xformatv _exp_val "es_xrand _exp_result %1" _exp_val
+}
+
+block exp_randplayer
+{
+   es_xformatv _exp_val "getrandplayer _exp_result %1" _exp_val
+}
+
+block exp_steamid
+{
+   es_xformatv _exp_val "es_xgetplayersteamid _exp_result %1" _exp_val
+}
+
+block exp_strlen
+{
+   es_xformatv _exp_val "es_xstrlen _exp_result %1" _exp_val
+}
+
+block exp_token
+{
+   es_xformatv _exp_val "es_xtoken _exp_result %1" _exp_val
+}
+
+block exp_uniqueid
+{
+   es_xformatv _exp_val "uniqueid _exp_result %1" _exp_val
+}
+
+block exp_userid
+{
+   es_xformatv _exp_val "es_xgetuserid _exp_result %1" _exp_val
+}
+
+block exp_username
+{
+   es_xformatv _exp_val "es_xgetplayername _exp_result %1" _exp_val
+}
+
+block test_exp
+{
+   profile begin exp_test
+   testlib begin exp1 "exp test 1 - server_var()"
+   es_xset _exp_testvar 3
+   exp es_xif(server_var(_exp_testvar) = 3) then es_xset _exp_testvar 7
+   testlib fail_unless _exp_testvar equalto 7
+   testlib end
+   testlib begin exp2 "exp test 2 - sv()"
+   es_xset _exp_testvar 2
+   exp es_xif(sv(_exp_testvar) = 2) then es_xset _exp_testvar 8
+   testlib fail_unless _exp_testvar equalto 8
+   testlib end
+   testlib begin exp3 "exp test 3 - server_var(server_var())"
+   es_xset _exp_testvar _exp_testvar2
+   es_xset _exp_testvar2 6
+   exp es_xif(server_var(server_var(_exp_testvar)) = 6) then es_xset _exp_testvar 9
+   testlib fail_unless _exp_testvar equalto 9
+   testlib end
+   testlib begin exp4 "exp test 4 - nq()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar nq("hello world my name is chun")
+   testlib fail_unless _exp_testvar equalto hello
+   testlib end
+   testlib begin exp5 "exp test 5 - eq()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar eq("hello" "world")
+   testlib fail_unless _exp_testvar equalto "hello world"
+   testlib end
+   testlib begin exp6 "exp test 6 - cond()"
+   es_xset _exp_testvar 0
+   exp es_xset _exp_testvar cond(hello = hello)
+   testlib fail_unless _exp_testvar equalto 1
+   testlib end
+   testlib begin exp7 "exp test 7 - ins()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar ins(1 hello world)
+   testlib fail_unless _exp_testvar equalto world
+   testlib end
+   testlib begin exp8 "exp test 8 - define()"
+   exp define(_this_var_is_unlikely_to_be_used) 7
+   testlib fail_unless _this_var_is_unlikely_to_be_used equalto 7
+   testlib end
+   testlib begin exp9 "exp test 9 - rand()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar rand(1 2)
+   testlib fail_unless _exp_testvar notequalto 0
+   testlib end
+   testlib begin exp10 "exp test 10 - strlen()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar strlen("hello world")
+   testlib fail_unless _exp_testvar equalto 11
+   testlib end
+   testlib begin exp11 "exp test 11 - token()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar token("hello world I am Chun" 2)
+   testlib fail_unless _exp_testvar equalto world
+   testlib end
+   testlib begin exp12 "exp test 12 - string()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar string("hello world" replace o)
+   testlib fail_unless _exp_testvar equalto "hell wrld"
+   testlib end
+   testlib begin exp13 "exp test 13 - keyval()"
+   es_xkeycreate _exptest
+   es_xkeysetvalue _exptest val 5
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar keyval(_exptest val)
+   es_xkeydelete _exptest
+   testlib fail_unless _exp_testvar equalto 5
+   testlib end
+   testlib begin exp14 "exp test 14 - math()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar math(5 + 2)
+   testlib fail_unless _exp_testvar equalto 7
+   testlib end
+   testlib begin exp15 "exp test 15 - mathparse()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar mathparse("5+2")
+   testlib fail_unless _exp_testvar equalto 7
+   testlib end
+   testlib begin exp16 "exp test 16 - exists()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar exists(variable _tempcore)
+   testlib fail_unless _exp_testvar equalto 1
+   testlib end
+   testlib begin exp17 "exp test 17 - isnumerical()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar isnumerical(125)
+   testlib fail_unless _exp_testvar equalto 1
+   testlib end
+   testlib begin exp18 "exp test 18 - isnull()"
+   es_xset _exp_testvar a
+   es_xstring _exp_testvar replace a
+   exp es_xsetinfo _exp_testvar isnull(_exp_testvar)
+   testlib fail_unless _exp_testvar equalto 1
+   testlib end
+   testlib begin exp19 "exp test 19 - textlib()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar textlib(tokencount aaaa a)
+   testlib fail_unless _exp_testvar equalto 4
+   testlib end
+   testlib begin exp20 "exp test 20 - average()"
+   es_xset _exp_testvar 0
+   exp es_xsetinfo _exp_testvar average(5 7 9)
+   testlib fail_unless _exp_testvar equalto 7
+   testlib end
+   profile end exp_test
+}
+
+block test_uxp
+{
+   profile begin uxp_test
+   testlib begin uxp1 "uxp test 1 - strlen()"
+   uxp es_xset _uxp_testvar strlen(helloworld)
+   testlib fail_unless _uxp_testvar equalto 10
+   testlib end
+   testlib begin uxp2 "uxp test 2 - testcasefunc()"
+   uxp_reg create testcasefunc "es_xset %var %1"
+   uxp es_xset _uxp_testvar testcasefunc(17)
+   testlib fail_unless _uxp_testvar equalto 17
+   testlib end
+   profile end uxp_test
+}

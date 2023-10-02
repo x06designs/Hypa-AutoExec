@@ -1,0 +1,91 @@
+// Time Library -- originally created by McFly (thanks!)
+//Syntax: gettime <variable> <format>
+//Example: gettime MyTimeString "%H:%M:%S" OR gettime MyTimeString "%m-%d-%Y_%H:%M:%S"
+//Output: MyTimeString = 15:13:58 OR MyTimeString = 11-10-2006_15:13:58
+
+//Sub-Script loaded
+//--------------
+block load
+{
+        //Register commands
+  es_xsetinfo _tempcore 0
+  es_xexists _tempcore command gettime
+  es es_xif (server_var(_tempcore) == 0) do
+  {
+        es_xregcmd gettime corelib/timelib/gettime "Gets time string of the specified format"
+  }
+}
+//e-
+
+//Get time
+//----------
+//Returns string depending on format in variable
+block gettime
+{
+        //Check args
+        es_xsetinfo tfArgsC 0
+        es_xgetargc tfArgsC
+        if(server_var(tfArgsC) != 3) do
+        {
+                echo [GetTime] - Wrong parameters for gettime
+                echo [GetTime] - Syntax: gettime <variable> <format>
+        }
+        else do
+        {
+                //Get args
+                es_xsetinfo tfVariable 0
+                es_xsetinfo tfFormat 0
+                es_xgetargv tfVariable 1
+                es_xgetargv tfFormat 2
+
+                //Check variable
+                if(server_var(tfVariable) = 0) do
+                {
+                        echo [gettime] - Wrong variable name specified
+                }
+                else do
+                {
+                        //Check format
+                        if(server_var(tfFormat) = 0) do
+                        {
+                                echo [gettime] - Wrong format specified
+                        }
+                        else do
+                        {
+                                //create/reset variable
+                                es_setinfo server_var(tfVariable) 0
+
+                                //Get time string in variable
+                                es_setinfo tfOldTimeFormat server_var(eventscripts_timeformat)
+                                es_xcopy eventscripts_timeformat tfFormat
+                                es es_gettimestring server_var(tfVariable)
+                                es_xcopy eventscripts_timeformat tfOldTimeFormat
+                        }
+                }
+        }
+}
+//e-
+
+//GetTime test
+//-----------
+block gettimetest
+{
+        gettime tfTestVar "%H:%M"
+
+        es_xsetinfo tfTestTime 0
+        es_setinfo tfOldTimeFormat server_var(eventscripts_timeformat)
+        es_xsetinfo tfFormat "%H:%M"
+        es_xcopy eventscripts_timeformat tfFormat
+        es_gettimestring tfTestTime
+        es_xcopy eventscripts_timeformat tfOldTimeFormat
+
+        if(server_var(tfTestVar) = server_var(tfTestTime)) do
+        {
+                es_xdbgmsg 0 GetTime test successful
+        }
+        else do
+        {
+                es_xdbgmsg 0 GetTime test failed
+        }
+}
+//e-

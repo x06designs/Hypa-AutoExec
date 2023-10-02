@@ -1,0 +1,2834 @@
+// File 'dev_a.txt' //
+// Popup EventScripts library, Artichoke beta release 9
+//  Script author: GODJonez
+// See http://www.eventscripts.com/pages/Popup for more information
+// File 'dev_serverevents.txt' //
+event es_map_start
+{
+  // On map change, all popups are removed from queues. Most efficiently, the whole player database is recreated
+  es_xkeygroupdelete _popup_users
+  es_xkeygroupcreate _popup_users
+  // on player_activate the user data is re-entered anyway... :)
+  
+  es_xforeachkey _popup_popupname in _popup_menus "es_xdoblock popup/pop_clear"
+}
+
+// File 'dev__user.txt' //
+block user_newuser
+{
+  es_keycreate _popup_users server_var(_popup_userid)
+  es_getplayername _popup_username server_var(_popup_userid)
+  es_keysetvalue _popup_users server_var(_popup_userid) name server_var(_popup_username)
+  es_keysetvalue _popup_users server_var(_popup_userid) team "0"
+  es_keysetvalue _popup_users server_var(_popup_userid) isdead "0"
+  es_keysetvalue _popup_users server_var(_popup_userid) isbot "0"
+}
+
+block user_newhuman
+{
+  es_keysetvalue _popup_users server_var(_popup_userid) queuestart "1"
+  es_keysetvalue _popup_users server_var(_popup_userid) queueend "0"
+  es_keysetvalue _popup_users server_var(_popup_userid) closemode "0"
+  es_keysetvalue _popup_users server_var(_popup_userid) active "0"
+  es_keysetvalue _popup_users server_var(_popup_userid) activepage "0"
+  es_keysetvalue _popup_users server_var(_popup_userid) activelink "0"
+}
+
+block user_isbot
+{
+  es_isbot _popup_userisbot server_var(_popup_userid)
+  ifx false(_popup_userisbot) do
+  {
+    es_getplayersteamid _popup_temp server_var(_popup_userid)
+    if (server_var(_popup_temp) == "BOT") then _popup_userisbot 2
+  }
+  es_keysetvalue _popup_users server_var(_popup_userid) isbot server_var(_popup_userisbot)
+}
+
+block user_info
+{
+  es_keygetvalue _popup_username _popup_users server_var(_popup_userid) name
+  es_keygetvalue _popup_userteam _popup_users server_var(_popup_userid) team
+  es_keygetvalue _popup_userisdead _popup_users server_var(_popup_userid) isdead
+  es_keygetvalue _popup_userbot _popup_users server_var(_popup_userid) isbot
+}
+
+
+block user_checkqueue
+{
+  es_keygetvalue _popup_que_start _popup_users server_var(_popup_userid) "queuestart"
+  es_keygetvalue _popup_que_end _popup_users server_var(_popup_userid) "queueend"
+  es_xset _popup_popupname 0
+  es_xdoblock popup/loop_userqueue
+  es_keysetvalue _popup_users server_var(_popup_userid) "queuestart" server_var(_popup_que_start)
+  ifx true(_popup_popupname) do
+  {
+    es_xformatv _popup_format queue%1page _popup_que_start
+    es_keygetvalue _popup_page _popup_users server_var(_popup_userid) server_var(_popup_format)
+    ifx false(_popup_page) do
+    {
+      es_xset _popup_page 1
+    }
+    es_xdoblock popup/user_viewpopup
+  }
+}
+
+block loop_userqueue
+{
+  if (server_var(_popup_que_start) <= server_var(_popup_que_end)) do
+  {
+    es_xformatv _popup_format queue%1 _popup_que_start
+    es_keygetvalue _popup_popupname _popup_users server_var(_popup_userid) server_var(_popup_format)
+    ifx false(_popup_popupname) do
+    {
+      es_xmath _popup_que_start + 1
+      es_xdoblock popup/loop_userqueue
+    }
+  }
+}
+
+
+block user_viewpopup
+{
+  es_keygetvalue _popup_type _popup_menus server_var(_popup_popupname) "type"
+  es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_popupname) "cachemode"
+  es_keygetvalue _popup_block _popup_menus server_var(_popup_popupname) "prepuser"
+  ifx true(_popup_block) do
+  {
+    es_doblock server_var(_popup_block)
+  }
+  if (server_var(_popup_type) == 0) then es_xdoblock popup/user_viewpopup0
+}
+
+block user_viewpopup0
+{
+  // A normal popup
+  if (server_var(_popup_cachemode) in "global,static") do
+  {
+    es_keygetvalue _popup_cachere _popup_menus server_var(_popup_popupname) "cachere"
+    ifx true(_popup_cachere) do
+    {
+      es_xdoblock popup/util_recache_global
+    }
+    else do
+    {
+      es_keygetvalue _popup_cache _popup_menus server_var(_popup_popupname) "cache"
+    }
+  }
+  else do
+  {
+    // cachemode user
+    es_xformatv _popup_format cache_%1 _popup_popupname
+    es_keygetvalue _popup_cache _popup_users server_var(_popup_userid) server_var(_popup_format)
+    ifx false(_popup_cache) do
+    {
+      es_xdoblock popup/util_recache_user0
+    }
+  }
+  es_keysetvalue _popup_users server_var(_popup_userid) "cachelast" server_var(_popup_cache)
+  es_keysetvalue _popup_users server_var(_popup_userid) "active" server_var(_popup_popupname)
+  es_keygetvalue _popup_temp _popup_menus server_var(_popup_popupname) "actived"
+  es_xmath _popup_temp + 1
+  es_xformatv _popup_format active%1 _popup_temp
+  es_keysetvalue _popup_menus server_var(_popup_popupname) "actived" server_var(_popup_temp)
+  es_keysetvalue _popup_menus server_var(_popup_popupname) server_var(_popup_format) server_var(_popup_userid)
+  es_keysetvalue _popup_users server_var(_popup_userid) "activelink" server_var(_popup_temp)
+  es_keygetvalue _popup_timer _popup_menus server_var(_popup_popupname) "timeoutview"
+  es_menu 0 server_var(_popup_userid) server_var(_popup_cache)
+  ifx true(_popup_timer) do
+  {
+    es_delayed server_var(_popup_timer) popup unsendid server_var(_popup_que_start) server_var(_popup_userid)
+  }
+}
+
+event player_disconnect
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: player_disconnect event_var(userid)
+  }
+  es_exists _popup_exists key _popup_users event_var(userid)
+  ifx true(_popup_exists) do
+  {
+    es_keydelete _popup_users event_var(userid)
+  }
+  es_set _popup_userid event_var(userid)
+  es_xdoblock popup/user_newuser
+  es_xdoblock popup/user_isbot
+  ifx false(_popup_userisbot) do
+  {
+    es_xdoblock popup/user_newhuman
+  }
+}
+
+event player_activate
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: player_activate event_var(userid)
+  }
+  es_set _popup_userid event_var(userid)
+  es_xdoblock popup/user_newuser
+  es_xdoblock popup/user_isbot
+  ifx false(_popup_userisbot) do
+  {
+    es_xdoblock popup/user_newhuman
+  }
+}
+
+event player_spawn
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: player_spawn event_var(userid) in team event_var(es_userteam)
+  }
+  es_exists _popup_exists key _popup_users event_var(userid)
+  ifx true(_popup_exists) do
+  {
+    if (event_var(es_userteam) < 2) do
+    {
+      es_keysetvalue _popup_users event_var(userid) isdead "1"
+    }
+    else do
+    {
+      es_keysetvalue _popup_users event_var(userid) isdead "0"
+    }
+  }
+}
+
+event player_death
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: player_death event_var(es_username) by event_var(es_attackername) with event_var(weapon)
+  }
+  // This way getting player dead/alive is more accurate than relying on playerprop, which is about 3 seconds late
+  es_keysetvalue _popup_users event_var(userid) isdead "1"
+}
+
+event player_changename
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: player_changename event_var(userid) event_var(name) -> event_var(newname)
+  }
+  es_keysetvalue _popup_users event_var(userid) name event_var(newname)
+}
+
+event player_team
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: player_team event_var(userid) event_var(oldteam) -> event_var(team)
+  }
+  es_exists _popup_exists key _popup_users event_var(userid)
+  ifx true(_popup_exists) do
+  {
+    es_keysetvalue _popup_users event_var(userid) team event_var(team)
+  }
+}
+
+event es_client_command
+{
+  ifx true(_popup_debug) do
+  {
+    es_dbgmsg 0 POPUP DEBUG: es_client_command event_var(command) event_var(commandstring)
+  }
+  if (event_var(command) == "menuselect") do
+  {
+    if (event_var(commandstring) > 0) do
+    {
+      // as only positive numeric values are ok, then its easy comparison
+      es_set _popup_userid event_var(userid)
+      es_set _popup_choice event_var(commandstring)
+      es_keygetvalue _popup_popupname _popup_users server_var(_popup_userid) "active"
+      es_keygetvalue _popup_closemode _popup_users server_var(_popup_userid) "closemode"
+      es_keysetvalue _popup_users server_var(_popup_userid) "active" "0"
+      es_keysetvalue _popup_users server_var(_popup_userid) "closemode" "0"
+      ifx true(_popup_popupname) do
+      {
+        es_xdoblock popup/pop_select
+      }
+    }
+  }
+}
+
+block say_cmd
+{
+  es_xgetcmduserid _popup_userid
+  es_keygetvalue _popup_popupname _popup_users server_var(_popup_userid) "active"
+  ifx true(_popup_popupname) do
+  {
+    es_keygetvalue _popup_cache _popup_users server_var(_popup_userid) "lastcache"
+    es_menu 0 server_var(_popup_userid) server_var(_popup_cache)
+  }
+}
+// File 'dev_filters.txt' //
+block filter_player_all
+{
+  filter_ok 1
+}
+
+block filter_player_0
+{
+  if (server_var(filter_userteam) == 0) then filter_ok 1
+}
+
+block filter_player_1
+{
+  if (server_var(filter_userteam) == 1) then filter_ok 1
+}
+
+block filter_player_2
+{
+  if (server_var(filter_userteam) == 2) then filter_ok 1
+}
+
+block filter_player_3
+{
+  if (server_var(filter_userteam) == 3) then filter_ok 1
+}
+
+block filter_player_dead
+{
+  ifx true(filter_userisdead) do
+  {
+    filter_ok 1
+  }
+}
+
+block filter_player_alive
+{
+  ifx false(filter_userisdead) do
+  {
+    filter_ok 1
+  }
+}
+
+block filter_player_human
+{
+  ifx false(filter_userisbot) do
+  {
+    filter_ok 1
+  }
+}
+
+block filter_player_bot
+{
+  ifx true(filter_userisbot) do
+  {
+    filter_ok 1
+  }
+}
+// File 'dev_init.txt' //
+block load
+{
+  es_xdoblock popup/init_vars
+  es_xdoblock popup/init_stacks
+  es_xdoblock popup/init_keygroups
+  es_xdoblock popup/init_commands
+  es_xdoblock popup/init_users
+  es_xdoblock popup/init_subscripts
+}
+
+block unload
+{
+  es_xdoblock popup/fin_stacks
+  es_xdoblock popup/fin_keygroups
+  es_xdoblock popup/fin_subscripts
+  // No popups on user screens are handled on unload, they keep displaying there unless the user confirms
+  // This is because there should never be any need to unload this script, if there is, it is very likely
+  // a serious problem with this script, in which case it would be best to minimize actions done here.
+}
+
+
+block init_vars
+{
+  // This block creates all the variables this script needs
+  es_xset _popup_count 0 "Popup internal: total popups in memory"
+  
+  es_xset _popup_exists 0 "Popup internal: es_exists variable"
+  es_xset _popup_temp 0 "Popup internal: temporary variable"
+  es_xset _popup_lines 0 "Popup internal: number of lines in a popup"
+  es_xset _popup_format 0 "Popup internal: format variable"
+  es_xset _popup_keyname 0 "Popup internal: latest key used"
+  es_xset _popup_gamename 0 "Popup internal: latest key used"
+  es_xset _popup_index 0 "Popup internal: popup index number"
+  es_xset _popup_active 0 "Popup internal: popup active number"
+  es_xset _popup_type 0 "Popup internal: popup type number"
+  es_xset _popup_ctype 0 "Popup internal: popup construct type"
+  es_xset _popup_flags 0 "Popup internal: popup flags"
+  es_xset _popup_page 0 "Popup internal: popup page number"
+  es_xset _popup_pages 0 "Popup internal: popup pages"
+  es_xset _popup_dispmode 0 "Popup internal: popup display mode"
+  es_xset _popup_cachemode 0 "Popup internal: popup cache mode"
+  es_xset _popup_cachere 0 "Popup internal: popup cache info"
+  es_xset _popup_cache 0 "Popup internal: popup cache string"
+  es_xset _popup_popupname 0 "Popup internal: latest popup used"
+  es_xset _popup_description 0 "Popup internal: popup description"
+  es_xset _popup_force 0 "Popup internal: force resend"
+  es_xset _popup_force0 0 "Popup internal: force resend"
+  es_xset _popup_strlen 0 "Popup internal: string length"
+  es_xset _popup_constructblock 0 "Popup internal: construct block"
+  es_xset _popup_filterblock 0 "Popup internal: filter block"
+  es_xset _popup_filterbots 0 "Popup internal: filter bots"
+  es_xset _popup_saveblock 0 "Popup internal: save block"
+  es_xset _popup_compare 0 "Popup internal: comparison variable"
+  es_xset _popup_timer 0 "Popup internal: timer variable"
+  es_xset _popup_stack 0 "Popup internal: stack name"
+  es_xset _popup_closemode 0 "Popup internal: close mode enabled"
+  es_xset _popup_debug 0 "Popup internal: client command debugging"
+  es_xset _popup_block 0 "Popup internal: ext block to be executed"
+  es_xset _popup_msblock 0 "Popup internal: ext block to be executed on menuselect"
+  es_xset _popup_action 0 "Popup internal:  action performed"
+
+  es_xset _popup_language 0 "Popup internal: popup language"
+  es_xset _popup_lan_prev 0 "Popup internal: previous label"
+  es_xset _popup_lan_next 0 "Popup internal: next label"
+  es_xset _popup_lan_exit 0 "Popup internal: exit label"
+  es_xset _popup_lan_pending 0 "Popup internal: pending label"
+  
+  es_xset _popup_c_stateby 0 "Popup internal: construct stateby condition"
+  es_xset _popup_c_state0format 0 "Popup internal: construct state 0 formatting"
+  es_xset _popup_c_state1format 0 "Popup internal: construct state 1 formatting"
+  es_xset _popup_c_titleformat 0 "Popup internal: construct title formatting"
+  es_xset _popup_c_beginsep 0 "Popup internal: beginning separator"
+  es_xset _popup_c_pagesep 0 "Popup internal: page control separator"
+  es_xset _popup_c_pageformat 0 "Popup internal: page control format"
+  es_xset _popup_c_endsep 0 "Popup internal: ending separator"
+  es_xset _popup_c_exitformat 0 "Popup internal: exit command format"
+  es_xset _popup_c_nowlength 0 "Popup internal: current line length"
+  es_xset _popup_c_maxlength 0 "Popup internal: maximum line length"
+  es_xset _popup_c_teamname 0 "Popup internal: team name"
+  
+  es_xset _popup_que_start 0 "Popup internal: queue start"
+  es_xset _popup_que_end 0 "Popup internal: queue end"
+  es_xset _popup_que_length 0 "Popup internal: queue length"
+  
+  es_xset _popup_argc 0 "Popup internal: parameter count"
+  es_xset _popup_args_format 0 "Popup internal: format location"
+  es_xset _popup_arg_format 0 "Popup internal: format string"
+  es_xset _popup_arg_format1 0 "Popup internal: format token"
+  es_xset _popup_arg_format2 0 "Popup internal: format token"
+  es_xset _popup_arg_format3 0 "Popup internal: format token"
+  es_xset _popup_arg_format4 0 "Popup internal: format token"
+  es_xset _popup_arg_format5 0 "Popup internal: format token"
+  es_xset _popup_arg_format6 0 "Popup internal: format token"
+  es_xset _popup_arg_format7 0 "Popup internal: format token"
+  es_xset _popup_arg_format8 0 "Popup internal: format token"
+  es_xset _popup_arg_format9 0 "Popup internal: format token"
+  es_xset _popup_arg_com 0 "Popup internal: command parameter"
+  es_xset _popup_arg_name 0 "Popup internal: name parameter"
+  es_xset _popup_arg_var 0 "Popup internal: var parameter"
+  es_xset _popup_arg_line 0 "Popup internal: line parameter"
+  es_xset _popup_arg_text 0 "Popup internal: text parameter"
+  es_xset _popup_arg_block 0 "Popup internal: block parameter"
+  es_xset _popup_arg_user 0 "Popup internal: user parameter"
+  
+  es_xset _popup_loop_1 0 "Popup internal: loop counter"
+  es_xset _popup_loop_2 0 "Popup internal: loop counter"
+  es_xset _popup_loop_3 0 "Popup internal: loop counter"
+  es_xset _popup_loop_dir 0 "Popup internal: loop direction"
+  es_xset _popup_loop_temp 0 "Popup internal: loop temp variable"
+  es_xset _popup_loop_format 0 "Popup internal: loop format variable"
+  es_xset _popup_loop_limit 0 "Popup internal: loop limit value"
+
+  
+  es_xset _popup_username 0 "Popup public:   the name of current popup user"
+  es_xset _popup_userteam 0 "Popup public:   the team of current popup user"
+  es_xset _popup_userisdead 0 "Popup public:   if the current popup user is dead or not"
+  es_xset _popup_userisbot 0 "Popup public:   0=human, 1=bot, 2=fakeclient"
+  es_xset _popup_userid 0 "Popup public:   the userid of current popup user"
+  es_xset _popup_choice 0 "Popup public:   the choice the user selected"
+  es_xset _popup_name 0 "Popup public:   the popup being handled"
+  
+  es_xset _popup_scriptname 0 "Popup public:   the name of the script for filters"
+  es_xset _popup_scriptstatus 0 "Popup public:   the status of the script for filters"
+  
+  es_xset _popup_entityname 0 "Popup public:   the entityname of the weapon"
+  es_xset _popup_weaponid 0 "Popup public:   the short name of the weapon"
+  es_xset _popup_weaponname 0 "Popup public:   the long name of the weapon"
+  es_xset _popup_weaponteams 0 "Popup public:   the teams that can buy the weapon"
+  es_xset _popup_weapontype 0 "Popup public:   the type of the weapon"
+  es_xset _popup_weaponslot 0 "Popup public:   the slot of the weapon"
+  
+  es_xset filter_username 0 "Filter:   the name of current user"
+  es_xset filter_userteam 0 "Filter:   the team of current user"
+  es_xset filter_userisdead 0 "Filter:   if the current user is dead or not"
+  es_xset filter_userisbot 0 "Filter:   0=human, 1=bot, 2=fakeclient"
+  es_xset filter_userid 0 "Filter:   the userid of current user"
+  es_xset filter_ok 0 "Filter:   Set this to 1 to pass the filter"
+  
+  es_xset popup_slashes "------------------------------" "Popup Line separator (30 chars min!)"
+  es_xset popup_version "Abr9" "Popup version identifier"
+  es_xmakepublic popup_version
+}
+
+
+block init_stacks
+{
+  // This block creates the global popup stacks
+  stack create _popup_stackstack
+  stack create _popup_varstack
+}
+
+block fin_stacks
+{
+  // This block deletes the global popup stacks
+  stack delete _popup_stackstack
+}
+
+block init_keygroups
+{
+  // This block handles creating and loading keygroups
+  es_xkeygroupcreate _popup_menus
+    es_xkeycreate _popup_menus _popup_index
+  es_xkeygroupcreate _popup_users
+  es_xkeygroupload _popup_lang |popup
+  es_xkeygroupload _popup_games |popup
+}
+
+block fin_keygroups
+{
+  // This block deletes the popup keygroups
+  es_xkeygroupdelete _popup_menus
+  es_xkeygroupdelete _popup_users
+  es_xkeygroupdelete _popup_lang
+  es_xkeygroupdelete _popup_games
+}
+
+block init_subscripts
+{
+  // This block loads the subscripts of popup
+  es_xload popup/popuphelp
+}
+
+block fin_subscripts
+{
+  // This block unloads the subscripts
+  es_xunload popup/popuphelp
+}
+
+block init_commands
+{
+  // This block creates the popup console command
+  es_xexists _popup_exists command popup
+  ifx false(_popup_exists) do
+  {
+    es_xregcmd popup popup/popup_cmd "Manage popup menus"
+  }
+  clientcmd create say !popup "popup/say_cmd" "view_popup" #all
+}
+
+block init_users
+{
+  // This block ensures safe operation in case popup was loaded too late
+  ifx true(eventscripts_currentmap) do
+  {
+    es_xdbgmsg 0 Popup was not loaded in autoexec.cfg. This is NOT optimal and may cause errors!
+    foreach player _popup_userid #all "es_xdoblock popup/init_userx"
+  }
+}
+
+block init_userx
+{
+  // This block initializes user data
+  es_xdoblock popup/user_newuser
+  es_getplayerteam _popup_userteam server_var(_popup_userid)
+  es_keysetvalue _popup_users server_var(_popup_userid) team server_var(_popup_userteam)
+  es_getplayerprop _popup_userisdead server_var(_popup_userid) "CCSPlayer.baseclass.pl.deadflag"
+  es_keysetvalue _popup_users server_var(_popup_userid) isdead server_var(_popup_userisdead)
+  es_xdoblock popup/user_isbot
+  ifx false(_popup_userisbot) do
+  {
+    es_xdoblock popup/user_newhuman
+  }
+}
+// File 'dev_popupcommands.txt' //
+block popup_cmd
+{
+  es stack push _popup_varstack server_var(_popup_argc)
+  es stack push _popup_varstack server_var(_popup_arg_com)
+  es stack push _popup_varstack server_var(_popup_arg_name)
+  es stack push _popup_varstack server_var(_popup_arg_var)
+  es stack push _popup_varstack server_var(_popup_arg_line)
+  es stack push _popup_varstack server_var(_popup_arg_text)
+  es stack push _popup_varstack server_var(_popup_arg_block)
+  es stack push _popup_varstack server_var(_popup_arg_user)
+  es stack push _popup_varstack server_var(_popup_que_start)
+  es stack push _popup_varstack server_var(_popup_que_end)
+  es stack push _popup_varstack server_var(_popup_que_length)
+  es stack push _popup_varstack server_var(_popup_index)
+  es stack push _popup_varstack server_var(_popup_active)
+  es stack push _popup_varstack server_var(_popup_type)
+  es stack push _popup_varstack server_var(_popup_page)
+  es stack push _popup_varstack server_var(_popup_dispmode)
+  es stack push _popup_varstack server_var(_popup_popupname)
+  es stack push _popup_varstack server_var(_popup_block)
+  es stack push _popup_varstack server_var(_popup_choice)
+  es stack push _popup_varstack server_var(_popup_userid)
+  
+  es_xgetargc _popup_argc
+  if (server_var(_popup_argc) == 1) do
+  {
+    es_xdoblock popup/popuphelp/help_usage_popup
+  }
+  else do
+  {
+    es_xgetargv _popup_arg_com 1
+    es_xgetargv _popup_arg_name 2
+    if (server_var(_popup_arg_name) == "_popup_index") do
+    {
+      // Do not try this at home
+      es_xdbgmsg 0 WARNING! Malicious usage attempt of popup script detected!
+    }
+    else do
+    {
+      es_xformatv _popup_format "popup/cmd_%1" _popup_arg_com
+      ifx true(_popup_debug) do
+      {
+        es_dbgmsg 0 POPUP COMMAND DEBUG: popup command block server_var(_popup_format)
+        es_dbgmsg 0 -- Popup name: server_var(_popup_arg_name)
+      }
+      es_doblock server_var(_popup_format)
+    }
+  }
+  stack pop _popup_userid _popup_varstack
+  stack pop _popup_choice _popup_varstack
+  stack pop _popup_block _popup_varstack
+  stack pop _popup_popupname _popup_varstack
+  stack pop _popup_dispmode _popup_varstack
+  stack pop _popup_page _popup_varstack
+  stack pop _popup_type _popup_varstack
+  stack pop _popup_active _popup_varstack
+  stack pop _popup_index _popup_varstack
+  stack pop _popup_que_length _popup_varstack
+  stack pop _popup_que_end _popup_varstack
+  stack pop _popup_que_start _popup_varstack
+  stack pop _popup_arg_user _popup_varstack
+  stack pop _popup_arg_block _popup_varstack
+  stack pop _popup_arg_text _popup_varstack
+  stack pop _popup_arg_line _popup_varstack
+  stack pop _popup_arg_var _popup_varstack
+  stack pop _popup_arg_name _popup_varstack
+  stack pop _popup_arg_com _popup_varstack
+  stack pop _popup_argc _popup_varstack
+}
+
+block cmd_create
+{
+  // Create a new popup!
+  if (server_var(_popup_argc) == 3) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx true(_popup_exists) do
+    {
+      es_xdoblock popup/cmd_delete
+    }
+    es_keycreate _popup_menus server_var(_popup_arg_name)
+    es_xmath _popup_count + 1
+    
+    es_keysetvalue _popup_menus "_popup_index" server_var(_popup_count) server_var(_popup_arg_name)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "index" server_var(_popup_count)
+    
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "type" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "lines" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "prepuser" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselect" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselectfb" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutsend" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutview" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "queued" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "actived" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachemode" "global"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cache" "Popup for Mattie's EventScripts!"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "displaymode" "normal"
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_create
+  }
+}
+
+block cmd_delete
+{
+  // Delete a popup
+  if (server_var(_popup_argc) == 3) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP DELETE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_index _popup_menus server_var(_popup_arg_name) "index"
+      es_keydelete _popup_menus server_var(_popup_arg_name)
+      if (server_var(_popup_index) < server_var(_popup_count)) do
+      {
+        es_keygetvalue _popup_popupname _popup_menus "_popup_index" server_var(_popup_count)
+        es_keysetvalue _popup_menus "_popup_index" server_var(_popup_index) server_var(_popup_popupname)
+        es_keysetvalue _popup_menus server_var(_popup_popupname) "index" server_var(_popup_index)
+      }
+      es_xmath _popup_count - 1
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_delete
+  }
+}
+
+block cmd_exists
+{
+  // Check if a popup exists
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_xgetargv _popup_arg_var 3
+    es_exists server_var(_popup_arg_var) key _popup_menus server_var(_popup_arg_name)
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_exists
+  }
+}
+
+block cmd_delline
+{
+  // Delete a line from a popup
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP DELLINE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        if (server_var(_popup_arg_line) <= 0) do
+        {
+          es_dbgmsg 0 POPUP DELLINE: Cannot delete line number server_var(_popup_arg_line) from server_var(_popup_arg_name)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > server_var(_popup_lines)) do
+          {
+            es_dbgmsg 0 POPUP DELLINE: Cannot delete line number server_var(_popup_arg_line) / server_var(_popup_lines) from server_var(_popup_arg_name) 
+          }
+          else do
+          {
+            if (server_var(_popup_arg_line) < server_var(_popup_lines)) do
+            {
+              es_xcopy _popup_popupname _popup_arg_name
+              es_xcopy _popup_loop_1 _popup_arg_line
+              es_xcopy _popup_loop_limit _popup_lines
+              es_xset _popup_loop_dir "+"
+              es_xdoblock popup/loop_movelines
+            }
+            es_xmath _popup_lines - 1
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) "lines" server_var(_popup_lines)
+            es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+            if (server_var(_popup_cachemode) == "global") do
+            {
+              es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+            }
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP DELLINE: Cannot delete a line from type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_delline
+  }
+}
+
+block cmd_addline
+{
+  // Add a line to a popup
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP ADDLINE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_text 3
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        es_xmath _popup_lines + 1
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) "lines" server_var(_popup_lines)
+        es_xformatv _popup_format "line%1" _popup_lines
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+        es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+        if (server_var(_popup_cachemode) == "global") do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP ADDLINE: Cannot add line to type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_addline
+  }
+}
+
+
+block cmd_insline
+{
+  // Insert a line to a popup
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP INSLINE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_xgetargv _popup_arg_text 4
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        es_xmath _popup_lines + 1
+        if (server_var(_popup_arg_line) <= 0) do
+        {
+          es_dbgmsg 0 POPUP INSLINE: Cannot insert line number server_var(_popup_arg_line) to server_var(_popup_arg_name)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > server_var(_popup_lines)) do
+          {
+            es_dbgmsg 0 POPUP INSLINE: Cannot insert line number server_var(_popup_arg_line) / server_var(_popup_lines) to server_var(_popup_arg_name) 
+          }
+          else do
+          {
+            if (server_var(_popup_arg_line) < server_var(_popup_lines)) do
+            {
+              es_xcopy _popup_popupname _popup_arg_name
+              es_xcopy _popup_loop_1 _popup_lines
+              es_xcopy _popup_loop_limit _popup_arg_line
+              es_xset _popup_loop_dir "-"
+              es_xdoblock popup/loop_movelines
+            }
+            es_xformatv _popup_format "line%1" _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) "lines" server_var(_popup_lines)
+            es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+            if (server_var(_popup_cachemode) == "global") do
+            {
+              es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+            }
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP INSLINE: Cannot insert a line to type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_insline
+  }
+}
+
+block cmd_modline
+{
+  // Modify a line in a popup
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP MODLINE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_xgetargv _popup_arg_text 4
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        if (server_var(_popup_arg_line) <= 0) do
+        {
+          es_dbgmsg 0 POPUP MODLINE: Cannot modify line number server_var(_popup_arg_line) in server_var(_popup_arg_name)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > server_var(_popup_lines)) do
+          {
+            es_dbgmsg 0 POPUP MODLINE: Cannot modify line number server_var(_popup_arg_line) / server_var(_popup_lines) in server_var(_popup_arg_name) 
+          }
+          else do
+          {
+            es_xformatv _popup_format "line%1" _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+            es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+            if (server_var(_popup_cachemode) == "global") do
+            {
+              es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+            }
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP MODLINE: Cannot modify a line in type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_modline
+  }
+}
+
+block cmd_addlinef
+{
+  // Add a line to a popup
+  if (server_var(_popup_argc) >= 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP ADDLINEf: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xset _popup_args_format 3
+        es_xdoblock popup/util_getformatv
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        es_xmath _popup_lines + 1
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) "lines" server_var(_popup_lines)
+        es_xformatv _popup_format "line%1" _popup_lines
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+        es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+        if (server_var(_popup_cachemode) == "global") do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP ADDLINEf: Cannot add line to type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_addlinef
+  }
+}
+
+
+block cmd_inslinef
+{
+  // Insert a line to a popup
+  if (server_var(_popup_argc) >= 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP INSLINEf: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_xset _popup_args_format 4
+        es_xdoblock popup/util_getformatv
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        es_xmath _popup_lines + 1
+        if (server_var(_popup_arg_line) <= 0) do
+        {
+          es_dbgmsg 0 POPUP INSLINEf: Cannot insert line number server_var(_popup_arg_line) to server_var(_popup_arg_name)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > server_var(_popup_lines)) do
+          {
+            es_dbgmsg 0 POPUP INSLINEf: Cannot insert line number server_var(_popup_arg_line) / server_var(_popup_lines) to server_var(_popup_arg_name) 
+          }
+          else do
+          {
+            if (server_var(_popup_arg_line) < server_var(_popup_lines)) do
+            {
+              es_xcopy _popup_popupname _popup_arg_name
+              es_xcopy _popup_loop_1 _popup_lines
+              es_xcopy _popup_loop_limit _popup_arg_line
+              es_xset _popup_loop_dir "-"
+              es_xdoblock popup/loop_movelines
+            }
+            es_xformatv _popup_format "line%1" _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) "lines" server_var(_popup_lines)
+            es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+            if (server_var(_popup_cachemode) == "global") do
+            {
+              es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+            }
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP INSLINEf: Cannot insert a line to type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_inslinef
+  }
+}
+
+block cmd_modlinef
+{
+  // Modify a line in a popup
+  if (server_var(_popup_argc) >= 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP MODLINEf: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_xset _popup_args_format 4
+        es_xdoblock popup/util_getformatv
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "lines"
+        if (server_var(_popup_arg_line) <= 0) do
+        {
+          es_dbgmsg 0 POPUP MODLINEf: Cannot modify line number server_var(_popup_arg_line) in server_var(_popup_arg_name)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > server_var(_popup_lines)) do
+          {
+            es_dbgmsg 0 POPUP MODLINEf: Cannot modify line number server_var(_popup_arg_line) / server_var(_popup_lines) in server_var(_popup_arg_name) 
+          }
+          else do
+          {
+            es_xformatv _popup_format "line%1" _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+            es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+            if (server_var(_popup_cachemode) == "global") do
+            {
+              es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+            }
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP MODLINEf: Cannot modify a line in type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_modlinef
+  }
+}
+
+block cmd_prepuser
+{
+  // Select a block to be executed just before a popup is viewed by a user
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP PREPUSER: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_block 3
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) "prepuser" server_var(_popup_arg_block)
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP PREPUSER: Cannot add prepuser to type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_prepuser
+  }
+}
+
+block cmd_menuselect
+{
+  // Assign a block to be executed whenever a menu item is selected from a popup
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP MENUSELECT: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_block 3
+      es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselect" server_var(_popup_arg_block)
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_menuselect
+  }
+}
+
+block cmd_menuselectfb
+{
+  // Assign a block to be executed whenever a menu item without other function is selected from a popup
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP MENUSELECTfb: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_block 3
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselectfb" server_var(_popup_arg_block)
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP MENUSELECTfb: Cannot set menuselectfb to type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_menuselectfb
+  }
+}
+
+block cmd_select
+{
+  // Assign a block for specific menu item in a popup
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP SELECT: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_xgetargv _popup_arg_block 4
+        if (server_var(_popup_arg_line) < 1) do
+        {
+          es_dbgmsg 0 POPUP SELECT: Menu item server_var(_popup_arg_line) is not possible! (allowed: 1-10)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > 10) do
+          {
+            es_dbgmsg 0 POPUP SELECT: Menu item server_var(_popup_arg_line) is not possible! (allowed: 1-10)
+          }
+          else do
+          {
+            es_xformatv _popup_format select%1 _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_block)
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP SELECT: Cannot use select for type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_select
+  }
+}
+
+block cmd_submenu
+{
+  // Assign a submenu/next page for specific menu item in a popup
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP SUBMENU: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_line 3
+        es_xgetargv _popup_arg_block 4
+        if (server_var(_popup_arg_line) < 1) do
+        {
+          es_dbgmsg 0 POPUP SUBMENU: Menu item server_var(_popup_arg_line) is not possible! (allowed: 1-10)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > 10) do
+          {
+            es_dbgmsg 0 POPUP SUBMENU: Menu item server_var(_popup_arg_line) is not possible! (allowed: 1-10)
+          }
+          else do
+          {
+            es_xformatv _popup_format submenu%1 _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_block)
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP SUBMENU: Cannot set custom submenus for type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_submenu
+  }
+}
+
+block cmd_menuvalue
+{
+  // Assign a variable to a value on choosing a specific menu item in a popup
+  if (server_var(_popup_argc) == 6) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP MENUVALUE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        es_xgetargv _popup_arg_var 3
+        es_xgetargv _popup_arg_line 4
+        es_xgetargv _popup_arg_block 5
+        if (server_var(_popup_arg_line) < 1) do
+        {
+          es_dbgmsg 0 POPUP MENUVALUE: Menu item server_var(_popup_arg_line) is not possible! (allowed: 1-10)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_line) > 10) do
+          {
+            es_dbgmsg 0 POPUP MENUVALUE: Menu item server_var(_popup_arg_line) is not possible! (allowed: 1-10)
+          }
+          else do
+          {
+            es_xformatv _popup_format menuvar%1 _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_var)
+            es_xformatv _popup_format menuval%1 _popup_arg_line
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_block)
+          }
+        }
+      }
+      else do
+      {
+        es_dbgmsg 0 POPUP MENUVALUE: Cannot set specific menuvalue for type server_var(_popup_type) popup server_var(_popup_arg_name)
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_menuvalue
+  }
+}
+
+block cmd_timeout
+{
+  // Assign a timeout for the popup
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP TIMEOUT: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_var 3
+      es_xgetargv _popup_arg_text 4
+      if (server_var(_popup_arg_text) < 0) do
+      {
+        es_dbgmsg 0 POPUP TIMEOUT: Invalid timeout value server_var(_popup_arg_text)
+      }
+      else do
+      {
+        if (server_var(_popup_arg_var) == "view") do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutview" server_var(_popup_arg_text)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_var) == "send") do
+          {
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutsend" server_var(_popup_arg_text)
+          }
+          else do
+          {
+            es_dbgmsg 0 POPUP TIMEOUT: Unknown timeout mode server_var(_popup_arg_var)
+          }
+        }
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_timeout
+  }
+}
+
+block cmd_send
+{
+  // Send the popup to user queue
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP SEND: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xset _popup_force 0
+      es_xset _popup_filterbots 1
+      es stack push _popup_stackstack server_var(_popup_stack)
+      es_xset _popup_stack _popup_sendstack
+      es stack create server_var(_popup_stack)
+      es_xgetargv _popup_arg_user 3
+      es_xdoblock popup/util_playerflags
+      if (server_var(_popup_temp) == "!") do
+      {
+        es_xcopy _popup_filterblock _popup_arg_user
+        es_strlen _popup_strlen server_var(_popup_filterblock)
+        es_string _popup_filterblock section 1 server_var(_popup_strlen)
+        es_xforeachkey _popup_keyname in _popup_users "es_xdoblock popup/util_playerfilter"
+      }
+      else do
+      {
+        if (server_var(_popup_temp) == "#") do
+        {
+          es_dbgmsg 0 POPUP SEND: Unsupported identifier server_var(_popup_arg_user)
+        }
+        else do
+        {
+          es_getuserid _popup_keyname server_var(_popup_arg_user)
+          ifx true(_popup_keyname) do
+          {
+            ifx false(_popup_force0) do
+            {
+              es_xgetcmduserid _popup_compare
+              if (server_var(_popup_keyname) == server_var(_popup_compare)) do
+              {
+                es_xset _popup_force 1
+              }
+              else do
+              {
+                if (event_var(userid) == server_var(_popup_keyname)) do
+                {
+                  if (event_var(text) != "0") do
+                  {
+                    es_xset _popup_force 1
+                  }
+                  else do
+                  {
+                    if (event_var(es_event) == "es_client_command") do
+                    {
+                      es_xset _popup_force 1
+                    }
+                  }
+                }
+              }
+            }
+            es stack push server_var(_popup_stack) server_var(_popup_keyname)
+          }
+          else do
+          {
+            es_dbgmsg 0 POPUP SEND: No player found for server_var(_popup_arg_user)
+          }
+        }
+      }
+      es_xdoblock popup/loop_send2queue
+      es stack delete server_var(_popup_stack)
+      stack pop _popup_stack _popup_stackstack
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_send
+  }
+}
+
+block cmd_unsend
+{
+  // Unsend a popup that has not been displayed yet
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_xgetargv _popup_arg_user 3
+    es_keygetvalue _popup_que_start _popup_users server_var(_popup_arg_user) "queuestart"
+    es_xformatv _popup_format queue%1 _popup_arg_name
+    es_keygetvalue _popup_popupname _popup_users server_var(_popup_arg_user) server_var(_popup_format)
+    es_dbgmsg 1 Unsending popup server_var(_popup_popupname) ...
+    if (server_var(_popup_arg_name) > server_var(_popup_que_start)) do
+    {
+      es_keysetvalue _popup_users server_var(_popup_arg_user) server_var(_popup_format) "0"
+      es_xformatv _popup_format queue%1link _popup_arg_name
+      es_keygetvalue _popup_index _popup_users server_var(_popup_arg_user) server_var(_popup_format)
+      es_xdoblock popup/pop_removefromqueue
+      es_dbgmsg 1 Popup was removed from the queue of user server_var(_popup_arg_user) due to timeout send setting
+    }
+    else do
+    {
+      es_dbgmsg 1 Popup was NOT removed from the queue of user server_var(_popup_arg_user) by timeout send, it has been viewed already
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_unsend
+  }
+}
+
+block cmd_unsendid
+{
+  // Unsend a popup that is visible
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_xgetargv _popup_arg_user 3
+    es_keygetvalue _popup_que_start _popup_users server_var(_popup_arg_user) "queuestart"
+    es_xformatv _popup_format queue%1 _popup_arg_name
+    es_keygetvalue _popup_popupname _popup_users server_var(_popup_arg_user) server_var(_popup_format)
+    es_dbgmsg 1 Unsendid popup server_var(_popup_popupname) ...
+    if (server_var(_popup_arg_name) == server_var(_popup_que_start)) do
+    {
+      //es_xformatv _popup_format queue%1link _popup_arg_name
+      //es_keygetvalue _popup_index _popup_users server_var(_popup_arg_user) server_var(_popup_format)
+      //es_xdoblock popup/pop_removefromqueue
+      //es_keygetvalue _popup_active _popup_users server_var(_popup_arg_user) "activelink"
+      //es_xdoblock popup/pop_removefromactive
+      //es_xmath _popup_que_start + 1
+      //es_keysetvalue _popup_users server_var(_popup_arg_user) "queuestart" server_var(_popup_que_start)
+      //es_xcopy _popup_userid _popup_arg_user
+      //es_keygetvalue _popup_temp _popup_users server_var(_popup_userid) "cachelast"
+      //// display the menu again but with 0.1 fade time, so it disappears in case there are no other popups
+      //es_keysetvalue _popup_users server_var(_popup_userid) "active" "0"
+      //es_menu 1 server_var(_popup_userid) server_var(_popup_temp)
+      //es_xdoblock popup/user_checkqueue
+      es_soon es_cexec server_var(_popup_arg_user) slot10
+      es_dbgmsg 1 Popup was removed from the queue of user server_var(_popup_arg_user) due to timeout view setting
+    }
+    else do
+    {
+      es_dbgmsg 1 Popup was NOT removed from the queue of user server_var(_popup_arg_user) by timeout view, it is not the popup viewed atm
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_unsendid
+  }
+}
+
+
+block cmd_unsendname
+{
+  // Unsend a popup from users
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP server_var(_popup_arg_com) : No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xcopy _popup_popupname _popup_arg_name
+      
+      es_xset _popup_filterbots 1
+      es stack push _popup_stackstack server_var(_popup_stack)
+      es_xset _popup_stack _popup_unsendstack
+      es stack create server_var(_popup_stack)
+      es_xgetargv _popup_arg_user 3
+      es_xdoblock popup/util_playerflags
+      if (server_var(_popup_temp) == "!") do
+      {
+        es_xcopy _popup_filterblock _popup_arg_user
+        es_strlen _popup_strlen server_var(_popup_filterblock)
+        es_string _popup_filterblock section 1 server_var(_popup_strlen)
+        es_xset _popup_loop_1 1
+        es_keygetvalue _popup_loop_limit _popup_menus server_var(_popup_arg_name) "queued"
+        es_xdoblock popup/loop_findqueueindexes
+      }
+      else do
+      {
+        if (server_var(_popup_temp) == "#") do
+        {
+          es_dbgmsg 0 POPUP server_var(_popup_arg_com) : Unsupported identifier server_var(_popup_arg_user)
+        }
+        else do
+        {
+          es_getuserid _popup_keyname server_var(_popup_arg_user)
+          ifx true(_popup_keyname) do
+          {
+            es_xset _popup_loop_1 1
+            es_keygetvalue _popup_loop_limit _popup_menus server_var(_popup_arg_name) "queued"
+            es_keygetvalue _popup_que_start _popup_users server_var(_popup_keyname) "queuestart"
+            es_xdoblock popup/loop_findqueueindex
+          }
+          else do
+          {
+            es_dbgmsg 0 POPUP server_var(_popup_arg_com) : No player found for server_var(_popup_arg_user)
+          }
+        }
+      }
+      es stack delete server_var(_popup_stack)
+      stack pop _popup_stack _popup_stackstack
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_unsendname
+  }
+}
+
+block cmd_close
+{
+  // Unsend a popup from users but do not trigger menuselect 10
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_xset _popup_closemode 1
+    es_xdoblock popup/cmd_unsendname
+    es_xset _popup_closemode 0
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_close
+  }
+}
+
+
+block cmd_isqueued
+{
+  // Check if a popup is in player queue
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_set server_var(_popup_arg_var) "0"
+      es_dbgmsg 1 POPUP ISQUEUED: No such popup server_var(_popup_arg_name) (var server_var(_popup_arg_var) set to 0)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_var 3
+      es_xgetargv _popup_arg_user 4
+      es_keygetvalue _popup_que_start _popup_users server_var(_popup_arg_user) "queuestart"
+      es_xcopy _popup_loop_1 _popup_que_start
+      es_keygetvalue _popup_loop_limit _popup_users server_var(_popup_arg_user) "queueend"
+      es_xset filter_ok 0
+      es_xdoblock popup/loop_isqueued
+      ifx false(filter_ok) do
+      {
+        es_set server_var(_popup_arg_var) "0"
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_isqueued
+  }
+}
+
+block cmd_active
+{
+  // Return info about a players queue
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_xgetargv _popup_arg_var 3
+    es_xgetargv _popup_arg_user 4
+    es_keygetvalue server_var(_popup_arg_name) _popup_users server_var(_popup_arg_user) "active"
+    es_keygetvalue _popup_que_start _popup_users server_var(_popup_arg_user) "queuestart"
+    es_keygetvalue _popup_que_end _popup_users server_var(_popup_arg_user) "queueend"
+    es_mathparse server_var(_popup_arg_var) "_popup_que_end-_popup_que_start+1"
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_active
+  }
+}
+
+block cmd_cachemode
+{
+  // Set cache mode for a popup
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP CACHEMODE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_text 3
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      ifx false(_popup_type) do
+      {
+        if (server_var(_popup_arg_text) in "static,global,user") do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachemode" server_var(_popup_arg_text)
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "1"
+        }
+        else do
+        {
+          es_dbgmsg 0 POPUP CACHEMODE: Invalid cachemode server_var(_popup_arg_text) for type server_var(_popup_type) popup!
+        }
+      }
+      else do
+      {
+        if (server_var(_popup_type) == 2) do
+        {
+          es_xdbgmsg 0 POPUP CACHEMODE: Cannot change cachemode for easymenus!
+        }
+        else do
+        {
+          if (server_var(_popup_arg_text) in "static,user,eval") do
+          {
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachemode" server_var(_popup_arg_text)
+          }
+          else do
+          {
+            es_dbgmsg 0 POPUP CACHEMODE: Invalid cachemode server_var(_popup_arg_text) for type server_var(_popup_type) popup!
+          }
+        }
+      }      
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_cachemode
+  }
+}
+
+block cmd_recache
+{
+  // Recache a popup
+  if (server_var(_popup_argc) > 2) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP RECACHE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      es_keygetvalue _popup_cachemode _popup_menus server_var(_popup_arg_name) "cachemode"
+      es_xcopy _popup_popupname _popup_arg_name
+      if (server_var(_popup_cachemode) == "user") do
+      {
+        ifx false(_popup_type) do
+        {
+          es_xset _popup_arg_block "popup/util_recache_user0"
+        }
+        else do
+        {
+          es_xset _popup_arg_block "popup/util_recache_user1"
+        }
+        es_xset _popup_filterbots 1
+        es stack push _popup_stackstack server_var(_popup_stack)
+        es_xset _popup_stack _popup_reacachestack
+        es stack create server_var(_popup_stack)
+        es_xgetargv _popup_arg_user 3
+        es_xdoblock popup/util_playerflags
+        if (server_var(_popup_temp) == "!") do
+        {
+          es_xcopy _popup_filterblock _popup_arg_user
+          es_strlen _popup_strlen server_var(_popup_filterblock)
+          es_string _popup_filterblock section 1 server_var(_popup_strlen)
+          es_xforeachkey _popup_keyname in _popup_users "es_xdoblock popup/util_playerfilter"
+        }
+        else do
+        {
+          if (server_var(_popup_temp) == "#") do
+          {
+            es_dbgmsg 0 POPUP REACACHE: Unsupported identifier server_var(_popup_arg_user)
+          }
+          else do
+          {
+            es_getuserid _popup_keyname server_var(_popup_arg_user)
+            ifx true(_popup_keyname) do
+            {
+              es stack push server_var(_popup_stack) server_var(_popup_keyname)
+            }
+            else do
+            {
+              es_dbgmsg 0 POPUP RECACHE: No player found for server_var(_popup_arg_user)
+            }
+          }
+        }
+        es stack getlength _popup_loop_2 server_var(_popup_stack)
+        es_xmath _popup_loop_2 + 1
+        es_xdoblock popup/loop_recache
+        es stack delete server_var(_popup_stack)
+        stack pop _popup_stack _popup_stackstack
+      }
+      else do
+      {
+        ifx false(_popup_type) do
+        {
+          es_xdoblock popup/util_recache_global
+        }
+        else do
+        {
+          if (server_var(_popup_type) == 1) do
+          {
+            es_xdoblock popup/util_recache_construct
+          }
+          else do
+          {
+            es_xdoblock popup/util_recache_easymenu
+          }
+        }
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_recache
+  }
+}
+
+block cmd_update
+{
+  // Update a popup on player screen
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP UPDATE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xset _popup_filterbots 1
+      es stack push _popup_stackstack server_var(_popup_stack)
+      es_xset _popup_stack _popup_updatestack
+      es stack create server_var(_popup_stack)
+      es_xgetargv _popup_arg_user 3
+      es_xdoblock popup/util_playerflags
+      if (server_var(_popup_temp) == "!") do
+      {
+        es_xcopy _popup_filterblock _popup_arg_user
+        es_strlen _popup_strlen server_var(_popup_filterblock)
+        es_string _popup_filterblock section 1 server_var(_popup_strlen)
+        es_xforeachkey _popup_keyname in _popup_users "es_xdoblock popup/util_playerfilter"
+      }
+      else do
+      {
+        if (server_var(_popup_temp) == "#") do
+        {
+          es_dbgmsg 0 POPUP UPDATE: Unsupported identifier server_var(_popup_arg_user)
+        }
+        else do
+        {
+          es_getuserid _popup_keyname server_var(_popup_arg_user)
+          ifx true(_popup_keyname) do
+          {
+            es stack push server_var(_popup_stack) server_var(_popup_keyname)
+          }
+          else do
+          {
+            es_dbgmsg 0 POPUP RECACHE: No player found for server_var(_popup_arg_user)
+          }
+        }
+      }
+      es stack getlength _popup_loop_1 server_var(_popup_stack)
+      es_xmath _popup_loop_1 + 1
+      es_xdoblock popup/loop_update
+      es stack delete server_var(_popup_stack)
+      stack pop _popup_stack _popup_stackstack
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_update
+  }
+}
+
+block cmd_displaymode
+{
+  // Change the display mode for a popup
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP DISPLAYMODE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_text 3
+      if (server_var(_popup_arg_text) == "normal") do
+      {
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) "displaymode" "normal"
+      }
+      else do
+      {
+        if (server_var(_popup_arg_text) == "sticky") do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) "displaymode" "sticky"
+        }
+        else do
+        {
+          es_dbgmsg 0 POPUP DISPLAYMODE: Unsupported displaymode server_var(_popup_arg_text)
+        }
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_displaymode
+  }
+}
+
+block cmd_construct
+{
+  // Construct a new popup!
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_xgetargv _popup_arg_block 3
+    es_xgetargv _popup_arg_text 4
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx true(_popup_exists) do
+    {
+      es_xdoblock popup/cmd_delete
+    }
+    es_keycreate _popup_menus server_var(_popup_arg_name)
+    es_xmath _popup_count + 1
+    
+    es_keysetvalue _popup_menus "_popup_index" server_var(_popup_count) server_var(_popup_arg_name)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "index" server_var(_popup_count)
+    
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "type" "1"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "ctype" server_var(_popup_arg_block)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "flags" server_var(_popup_arg_text)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "prepuser" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselect" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselectfb" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutsend" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutview" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "queued" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "actived" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachemode" "eval"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cache1" "Popup for Mattie's EventScripts!"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "displaymode" "normal"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "pages" "1"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_savevar" "_popup_choice"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_stateby" "1"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_state0format" "%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_state1format" "->%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_titleformat" server_var(_popup_arg_block)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_beginsep" "%-"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_pagesep" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_endsep" "%-"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_pageformat" "->%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_exitformat" "%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_language" "en"
+    es_xdoblock popup/util_getgamename
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_gamename" server_var(_popup_gamename)
+    es_xcopy _popup_popupname _popup_arg_name
+    es_xdoblock popup/util_recache_construct
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_construct
+  }
+}
+
+
+block cmd_setvar
+{
+  // Set a popup variable
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP SETVAR: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_var 3
+      es_xgetargv _popup_arg_text 4
+      if ("c_titleformat" == server_var(_popup_arg_var)) do
+      {
+        es_xstring _popup_arg_text replace "%p" "%2"
+        es_xstring _popup_arg_text replace "%t" "%3"
+      }
+      if ("c_stateby" != server_var(_popup_arg_var)) do
+      {
+        if ("c_state" in server_var(_popup_arg_var)) do
+        {
+          es_keygetvalue _popup_ctype _popup_menus server_var(_popup_arg_name) "ctype"
+          es_xformatv _popup_format "popup/construct_stateformat_%1" _popup_ctype
+          es_doblock server_var(_popup_format)
+        }
+      }
+      es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_arg_var) server_var(_popup_arg_text)
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_setvar
+  }
+}
+
+block cmd_getvar
+{
+  // Get a popup variable
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP GETVAR: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_var 3
+      es_xgetargv _popup_arg_text 4
+      es_keygetvalue server_var(_popup_arg_var) _popup_menus server_var(_popup_arg_name) server_var(_popup_arg_text)
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_getvar
+  }
+}
+
+block cmd_easymenu
+{
+  // Construct a new easymenu!
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_xgetargv _popup_arg_var 3
+    es_xgetargv _popup_arg_block 4
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx true(_popup_exists) do
+    {
+      es_xdoblock popup/cmd_delete
+    }
+    es_keycreate _popup_menus server_var(_popup_arg_name)
+    es_xmath _popup_count + 1
+    
+    es_keysetvalue _popup_menus "_popup_index" server_var(_popup_count) server_var(_popup_arg_name)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "index" server_var(_popup_count)
+    
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "type" "2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "prepuser" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "menuselect" server_var(_popup_arg_block)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutsend" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "timeoutview" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "queued" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "actived" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachemode" "eval"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cachere" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "cache1" "Popup for Mattie's EventScripts!"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "displaymode" "normal"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "pages" "1"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "options" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_savevar" server_var(_popup_arg_var)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_state0format" "%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_state1format" "->%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_titleformat" server_var(_popup_arg_var)
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_beginsep" "%-"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_pagesep" "0"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_endsep" "%-"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_pageformat" "->%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_exitformat" "%1. %2"
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "c_language" "en"
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_easymenu
+  }
+}
+
+block cmd_addoption
+{
+  // Add an option to easymenu
+  if (server_var(_popup_argc) >= 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP ADDOPTION: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_var 3
+      es_xgetargv _popup_arg_text 4
+      es_xgetargv _popup_arg_line 5
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      if (server_var(_popup_type) != 2) do
+      {
+        es_dbgmsg 0 POPUP ADDOPTION: This command is only available to easymenus! Popup server_var(_popup_arg_name) is of type server_var(_popup_type)
+      }
+      else do
+      {
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) "options"
+        es_xmath _popup_lines + 1
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) "options" server_var(_popup_lines)
+        es_xformatv _popup_format opt%1val _popup_lines
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_var)
+        es_xformatv _popup_format opt%1text _popup_lines
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+        es_xformatv _popup_format opt%1state _popup_lines
+        if (server_var(_popup_argc) == 6) do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_line)
+        }
+        else do
+        {
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) "1"
+        }
+        es_xformatv _popup_format opt_%1_i _popup_arg_var
+        es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_lines)
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_addoption
+  }
+}
+
+block cmd_setoption
+{
+  // Set an option in easymenu
+  if (server_var(_popup_argc) >= 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP SETOPTION: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_var 3
+      es_xgetargv _popup_arg_text 4
+      es_xgetargv _popup_arg_line 5
+      es_keygetvalue _popup_type _popup_menus server_var(_popup_arg_name) "type"
+      if (server_var(_popup_type) != 2) do
+      {
+        es_dbgmsg 0 POPUP SETOPTION: This command is only available to easymenus! Popup server_var(_popup_arg_name) is of type server_var(_popup_type)
+      }
+      else do
+      {
+        es_xformatv _popup_format opt_%1_i _popup_arg_var
+        es_keygetvalue _popup_lines _popup_menus server_var(_popup_arg_name) server_var(_popup_format)
+        if (server_var(_popup_argc) == 6) do
+        {
+          ifx true(_popup_arg_text) do
+          {
+            es_xformatv _popup_format opt%1text _popup_lines
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+          }
+          es_xformatv _popup_format opt%1state _popup_lines
+          es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_line)
+        }
+        else do
+        {
+          if (server_var(_popup_text) in "01") do
+          {
+            es_xformatv _popup_format opt%1state _popup_lines
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+          }
+          else do
+          {
+            es_xformatv _popup_format opt%1text _popup_lines
+            es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_arg_text)
+          }
+        }
+      }
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_setoption
+  }
+}
+
+block cmd_description
+{
+  // Set a popup description
+  if (server_var(_popup_argc) == 4) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP DESCRIPTION: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_arg_text 3
+      es_keysetvalue _popup_menus server_var(_popup_arg_name) "description" server_var(_popup_arg_text)
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_description
+  }
+}
+
+block cmd_emulate
+{
+  // Emulate a popup choice
+  if (server_var(_popup_argc) == 5) do
+  {
+    es_exists _popup_exists key _popup_menus server_var(_popup_arg_name)
+    ifx false(_popup_exists) do
+    {
+      es_dbgmsg 0 POPUP EMULATE: No such popup server_var(_popup_arg_name)
+    }
+    else do
+    {
+      es_xgetargv _popup_choice 3
+      es_xcopy _popup_popupname _popup_arg_name
+      es_xgetargv _popup_arg_user 4
+      
+      es_xset _popup_filterbots 1
+      es stack push _popup_stackstack server_var(_popup_stack)
+      es_xset _popup_stack _popup_emustack
+      es stack create server_var(_popup_stack)
+      es_xdoblock popup/util_playerflags
+      if (server_var(_popup_temp) == "!") do
+      {
+        es_xcopy _popup_filterblock _popup_arg_user
+        es_strlen _popup_strlen server_var(_popup_filterblock)
+        es_string _popup_filterblock section 1 server_var(_popup_strlen)
+        es_xforeachkey _popup_keyname in _popup_users "es_xdoblock popup/util_playerfilter"
+      }
+      else do
+      {
+        if (server_var(_popup_temp) == "#") do
+        {
+          es_dbgmsg 0 POPUP EMULATE: Unsupported identifier server_var(_popup_arg_user)
+        }
+        else do
+        {
+          if (server_var(_popup_arg_user) == "debug") do
+          {
+            es_xset _popup_keyname 0
+            es_xset _popup_debug 1
+          }
+          else do
+          {
+            es_getuserid _popup_keyname server_var(_popup_arg_user)
+          }
+          es stack push server_var(_popup_stack) server_var(_popup_keyname)
+        }
+      }
+      es stack getlength _popup_loop_1 server_var(_popup_stack)
+      es_xmath _popup_loop_1 + 1
+      es_xdoblock popup/loop_emulate
+      es stack delete server_var(_popup_stack)
+      stack pop _popup_stack _popup_stackstack
+      es_xset _popup_debug 0
+    }
+  }
+  else do
+  {
+    es_xdoblock popup/popuphelp/help_usage_emulate
+  }
+}
+// File 'dev_popuphandling.txt' //
+block pop_clear
+{
+  // Clear popup queue
+  if (server_var(_popup_popupname) != "_popup_index") do
+  {
+    es_keysetvalue _popup_menus server_var(_popup_popupname) queued 0
+    es_keysetvalue _popup_menus server_var(_popup_popupname) actived 0
+  }
+}
+
+block pop_removefromqueue
+{
+  // Remove a user from popup queue list
+  es_keygetvalue _popup_que_length _popup_menus server_var(_popup_popupname) "queued"
+  if (server_var(_popup_index) < server_var(_popup_que_length)) do
+  {
+    // Get the last queued user to _popup_temp
+    es_xformatv _popup_format queue%1 _popup_que_length
+    es_keygetvalue _popup_loop_temp _popup_menus server_var(_popup_popupname) server_var(_popup_format)
+    // Set the last queued user to replace the deleted slot
+    es_xformatv _popup_format queue%1 _popup_index
+    es_keysetvalue _popup_menus server_var(_popup_popupname) server_var(_popup_format) server_var(_popup_loop_temp)
+    // Copy the last queue link to _popup_temp
+    es_xformatv _popup_format queue%1link _popup_que_length
+    es_keygetvalue _popup_temp _popup_menus server_var(_popup_popupname) server_var(_popup_format)
+    // Set the queue link to replace the deleted slot
+    es_xformatv _popup_format queue%1link _popup_index
+    es_keysetvalue _popup_menus server_var(_popup_popupname) server_var(_popup_format) server_var(_popup_temp)
+    // Set the player in the moved slot to have correct queuelink
+    es_xformatv _popup_format queue%1link _popup_temp
+    es_keysetvalue _popup_users server_var(_popup_loop_temp) server_var(_popup_format) server_var(_popup_index)
+  }
+  es_xmath _popup_que_length - 1
+  es_keysetvalue _popup_menus server_var(_popup_popupname) "queued" server_var(_popup_que_length)
+}
+
+block pop_removefromactive
+{
+  // Remove a user from popup active list
+  es_keygetvalue _popup_que_length _popup_menus server_var(_popup_popupname) "actived"
+  if (server_var(_popup_active) < server_var(_popup_que_length)) do
+  {
+    // Get the last actived user to _popup_temp
+    es_xformatv _popup_format active%1 _popup_que_length
+    es_keygetvalue _popup_temp _popup_menus server_var(_popup_popupname) server_var(_popup_format)
+    // Set the last acived user to replace the deleted slot
+    es_xformatv _popup_format active%1 _popup_active
+    es_keysetvalue _popup_menus server_var(_popup_popupname) server_var(_popup_format) server_var(_popup_temp)
+    es_keysetvalue _popup_users server_var(_popup_temp) "activelink" server_var(_popup_active)
+  }
+  es_xmath _popup_que_length - 1
+  es_keysetvalue _popup_menus server_var(_popup_popupname) "actived" server_var(_popup_que_length)
+}
+
+block loop_movelines
+{
+  // Move lines inside the popup
+  if (server_var(_popup_loop_1) != server_var(_popup_loop_limit)) do
+  {
+    es_xcopy _popup_loop_temp _popup_loop_1
+    esnq es_xmath _popup_loop_temp server_var(_popup_loop_dir) 1
+    es_xformatv _popup_format "line%1" _popup_loop_temp
+    es_keygetvalue _popup_temp _popup_menus server_var(_popup_popupname) server_var(_popup_format)
+    es_xformatv _popup_format "line%1" _popup_loop_1
+    es_keysetvalue _popup_menus server_var(_popup_popupname) server_var(_popup_format) server_var(_popup_temp)
+    esnq es_xmath _popup_loop_1 server_var(_popup_loop_dir) 1
+    es_xdoblock popup/loop_movelines
+  }
+}
+
+block util_getformatv
+{
+  // Create the format string, for addlinef, modlinef, inslinef
+  es_getargv _popup_arg_format server_var(_popup_args_format)
+  es_xcopy _popup_loop_1 _popup_args_format
+  es_xmath _popup_loop_1 + 1
+  es_xdoblock popup/loop_getformatv
+//  es_formatv _popup_arg_text server_var(_popup_arg_format) server_var(_popup_arg_format1) server_var(_popup_arg_format2) server_var(_popup_arg_format3) server_var(_popup_arg_format4) server_var(_popup_arg_format5) server_var(_popup_arg_format6) server_var(_popup_arg_format7) server_var(_popup_arg_format8) server_var(_popup_arg_format9)
+  es_xcopy _popup_arg_text _popup_arg_format
+}
+
+block loop_getformatv
+{
+  if (server_var(_popup_loop_1) < server_var(_popup_argc)) do
+  {
+    es_xmathparse _popup_loop_temp "_popup_loop_1-_popup_args_format"
+//    es_xformatv _popup_format "_popup_arg_format%1" _popup_loop_temp
+//    es_getargv server_var(_popup_format) server_var(_popup_loop_1)
+ es_getargv _popup_arg_format1 server_var(_popup_loop_1)
+ es_xformatv _popup_format %%1 _popup_loop_temp
+ es_string _popup_arg_format replace server_var(_popup_format) server_var(server_var(_popup_arg_format1))
+    es_xmath _popup_loop_1 + 1
+    es_xdoblock popup/loop_getformatv
+  }
+}
+
+block util_getgamename
+{
+  es_xgetgame _popup_gamename
+  if ("Counter-Strike" in server_var(_popup_gamename)) do
+  {
+    es_xset _popup_gamename cstrike
+  }
+  if ("Day of Defeat" in server_var(_popup_gamename)) do
+  {
+    es_xset _popup_gamename dods
+  }
+  if ("Deathmatch" in server_var(_popup_gamename)) do
+  {
+    es_xset _popup_gamename hl2dm
+  }
+}
+
+block util_playerfilter
+{
+  // A player filtering block
+  es_xset filter_ok 0
+  es_keygetvalue filter_userisbot _popup_users server_var(_popup_keyname) "isbot"
+  ifx true(_popup_filterbots) do
+  {
+    ifx true(filter_userisbot) do
+    {
+      filter_ok 1
+    }
+  }
+  ifx false(filter_ok) do
+  {
+    es_keygetvalue filter_username _popup_users server_var(_popup_keyname) "name"
+    es_keygetvalue filter_userteam _popup_users server_var(_popup_keyname) "team"
+    es_keygetvalue filter_userisdead _popup_users server_var(_popup_keyname) "isdead"
+    es_xcopy filter_userid _popup_keyname
+    es_doblock server_var(_popup_filterblock)
+    ifx true(filter_ok) do
+    {
+      es stack push server_var(_popup_stack) server_var(_popup_keyname)
+    }
+  }
+}
+
+block util_scriptfilter
+{
+  // A script filtering block
+  es_xset filter_ok 0
+  es_xcopy _popup_scriptname _popup_keyname
+  es_keygetvalue _popup_scriptstatus _popup_users server_var(_popup_keyname) "status"
+  es_doblock server_var(_popup_filterblock)
+  ifx true(filter_ok) do
+  {
+    es stack push server_var(_popup_stack) server_var(_popup_keyname)
+  }
+}
+
+block util_weaponfilter
+{
+  // A weapon filtering block
+  es_xset filter_ok 0
+  es_xcopy _popup_weaponid _popup_keyname
+  es_keygetvalue _popup_entityname _popup_weaponlist server_var(_popup_keyname) "classname"
+  es_keygetvalue _popup_weaponname _popup_weaponlist server_var(_popup_keyname) "name"
+  es_keygetvalue _popup_weaponteams _popup_weaponlist server_var(_popup_keyname) "teams"
+  es_keygetvalue _popup_weapontype _popup_weaponlist server_var(_popup_keyname) "type"
+  es_keygetvalue _popup_weaponslot _popup_weaponlist server_var(_popup_keyname) "slot"
+  es_doblock server_var(_popup_filterblock)
+  ifx true(filter_ok) do
+  {
+    es stack push server_var(_popup_stack) server_var(_popup_keyname)
+  }
+}
+
+block util_playerflags
+{
+  es_xcopy _popup_temp _popup_arg_user
+  es_xstring _popup_temp section 0 1
+  if (server_var(_popup_temp) == "#") do
+  {
+    if (server_var(_popup_arg_user) == "#all") then es_xset _popup_arg_user "!popup/filter_player_all"
+    if (server_var(_popup_arg_user) == "#ct") then es_xset _popup_arg_user "!popup/filter_player_3"
+    if (server_var(_popup_arg_user) == "#3") then es_xset _popup_arg_user "!popup/filter_player_3"
+    if (server_var(_popup_arg_user) == "#t") then es_xset _popup_arg_user "!popup/filter_player_2"
+    if (server_var(_popup_arg_user) == "#2") then es_xset _popup_arg_user "!popup/filter_player_2"
+    if (server_var(_popup_arg_user) == "#spec") then es_xset _popup_arg_user "!popup/filter_player_1"
+    if (server_var(_popup_arg_user) == "#1") then es_xset _popup_arg_user "!popup/filter_player_1"
+    if (server_var(_popup_arg_user) == "#un") then es_xset _popup_arg_user "!popup/filter_player_0"
+    if (server_var(_popup_arg_user) == "#0") then es_xset _popup_arg_user "!popup/filter_player_0"
+    if (server_var(_popup_arg_user) == "#dead") then es_xset _popup_arg_user "!popup/filter_player_dead"
+    if (server_var(_popup_arg_user) == "#alive") then es_xset _popup_arg_user "!popup/filter_player_alive"
+    if (server_var(_popup_arg_user) == "#human") then es_xset _popup_arg_user "!popup/filter_player_human"
+    es_xcopy _popup_temp _popup_arg_user
+    es_xstring _popup_temp section 0 1
+  }
+}
+
+block util_scriptflags
+{
+  es_xcopy _popup_temp _popup_flags
+  es_xstring _popup_temp section 0 1
+  if (server_var(_popup_temp) == "#") do
+  {
+    if (server_var(_popup_arg_user) == "#all") then es_xset _popup_filterblock "!popup/filter_script_all"
+    if (server_var(_popup_arg_user) == "#enabled") then es_xset _popup_filterblock "!popup/filter_script_enabled"
+    if (server_var(_popup_arg_user) == "#disabled") then es_xset _popup_filterblock "!popup/filter_script_disabled"
+    es_xcopy _popup_temp _popup_filterblock
+    es_xstring _popup_temp section 0 1
+  }
+}
+
+block util_weaponflags
+{
+  es_xcopy _popup_temp _popup_flags
+  es_xstring _popup_temp section 0 1
+  if (server_var(_popup_temp) == "#") do
+  {
+    if (server_var(_popup_arg_user) == "#all") then es_xset _popup_filterblock "!popup/filter_weapon_all"
+    if (server_var(_popup_arg_user) == "#0") then es_xset _popup_filterblock "!popup/filter_weapon_0"
+    if (server_var(_popup_arg_user) == "#1") then es_xset _popup_filterblock "!popup/filter_weapon_1"
+    if (server_var(_popup_arg_user) == "#2") then es_xset _popup_filterblock "!popup/filter_weapon_2"
+    if (server_var(_popup_arg_user) == "#t") then es_xset _popup_filterblock "!popup/filter_weapon_2"
+    if (server_var(_popup_arg_user) == "#3") then es_xset _popup_filterblock "!popup/filter_weapon_3"
+    if (server_var(_popup_arg_user) == "#ct") then es_xset _popup_filterblock "!popup/filter_weapon_3"
+    if (server_var(_popup_arg_user) == "#melee") then es_xset _popup_filterblock "!popup/filter_weapon_melee"
+    if (server_var(_popup_arg_user) == "#pistols") then es_xset _popup_filterblock "!popup/filter_weapon_pistols"
+    if (server_var(_popup_arg_user) == "#shotguns") then es_xset _popup_filterblock "!popup/filter_weapon_shotguns"
+    if (server_var(_popup_arg_user) == "#smg") then es_xset _popup_filterblock "!popup/filter_weapon_smg"
+    if (server_var(_popup_arg_user) == "#rifles") then es_xset _popup_filterblock "!popup/filter_weapon_rifles"
+    if (server_var(_popup_arg_user) == "#mg") then es_xset _popup_filterblock "!popup/filter_weapon_mg"
+    if (server_var(_popup_arg_user) == "#grenades") then es_xset _popup_filterblock "!popup/filter_weapon_grenades"
+    if (server_var(_popup_arg_user) == "#equipment") then es_xset _popup_filterblock "!popup/filter_weapon_equipment"
+    if (server_var(_popup_arg_user) == "#slot1") then es_xset _popup_filterblock "!popup/filter_weapon_slot1"
+    if (server_var(_popup_arg_user) == "#slot2") then es_xset _popup_filterblock "!popup/filter_weapon_slot2"
+    if (server_var(_popup_arg_user) == "#slot3") then es_xset _popup_filterblock "!popup/filter_weapon_slot3"
+    if (server_var(_popup_arg_user) == "#slot4") then es_xset _popup_filterblock "!popup/filter_weapon_slot4"
+    if (server_var(_popup_arg_user) == "#slot5") then es_xset _popup_filterblock "!popup/filter_weapon_slot5"
+    if (server_var(_popup_arg_user) == "#slot6") then es_xset _popup_filterblock "!popup/filter_weapon_slot6"
+    if (server_var(_popup_arg_user) == "#slot7") then es_xset _popup_filterblock "!popup/filter_weapon_slot7"
+    if (server_var(_popup_arg_user) == "#slot8") then es_xset _popup_filterblock "!popup/filter_weapon_slot8"
+    if (server_var(_popup_arg_user) == "#slot9") then es_xset _popup_filterblock "!popup/filter_weapon_slot9"
+    if (server_var(_popup_arg_user) == "#slot10") then es_xset _popup_filterblock "!popup/filter_weapon_slot10"
+    es_xcopy _popup_temp _popup_filterblock
+    es_xstring _popup_temp section 0 1
+  }
+}
+
+block loop_send2queue
+{
+  es stack getlength _popup_strlen server_var(_popup_stack)
+  ifx true(_popup_strlen) do
+  {
+    es stack pop _popup_userid server_var(_popup_stack)
+    es_keygetvalue _popup_que_start _popup_users server_var(_popup_userid) "queuestart"
+    es_keygetvalue _popup_que_end _popup_users server_var(_popup_userid) "queueend"
+    ifx true(_popup_force) do
+    {
+      es_xmath _popup_que_start - 1
+      es_keysetvalue _popup_users server_var(_popup_userid) "queuestart" server_var(_popup_que_start)
+      es_xformatv _popup_format queue%1 _popup_que_start
+      es_keysetvalue _popup_users server_var(_popup_userid) server_var(_popup_format) server_var(_popup_arg_name)
+      es_xcopy _popup_que_end _popup_que_start
+      es_xset _popup_que_length 0
+    }
+    else do
+    {
+      es_xmath _popup_que_end + 1
+      es_keysetvalue _popup_users server_var(_popup_userid) "queueend" server_var(_popup_que_end)
+      es_xformatv _popup_format queue%1 _popup_que_end
+      es_keysetvalue _popup_users server_var(_popup_userid) server_var(_popup_format) server_var(_popup_arg_name)
+      es_xmathparse _popup_que_length "_popup_que_end-_popup_que_start"
+    }
+    ifx false(_popup_que_length) do
+    {
+      es_xdoblock popup/user_checkqueue
+    }
+    else do
+    {
+      es_keygetvalue _popup_timer _popup_menus server_var(_popup_arg_name) timeoutsend
+      ifx true(_popup_timer) do
+      {
+        es_delayed server_var(_popup_timer) popup unsend server_var(_popup_que_end) server_var(_popup_userid)
+      }
+    }
+    es_keygetvalue _popup_que_length _popup_menus server_var(_popup_arg_name) "queued"
+    es_xmath _popup_que_length + 1
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) "queued" server_var(_popup_que_length)
+    es_xformatv _popup_format queue%1 _popup_que_length
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_userid)
+    es_xformatv _popup_format queue%1link _popup_que_length
+    es_keysetvalue _popup_menus server_var(_popup_arg_name) server_var(_popup_format) server_var(_popup_que_end)
+    es_xformatv _popup_format queue%1link _popup_que_end
+    es_keysetvalue _popup_users server_var(_popup_userid) server_var(_popup_format) server_var(_popup_que_length)
+    es_xdoblock popup/loop_send2queue
+  }
+}
+
+block util_recache_global
+{
+  // Recache a popup with cachemode global
+  es_xdoblock popup/util_recache_0
+  es_keysetvalue _popup_menus server_var(_popup_popupname) "cachere" "0"
+  es_keysetvalue _popup_menus server_var(_popup_popupname) "cache" server_var(_popup_cache)
+}
+
+block util_recache_0
+{
+  es_keygetvalue _popup_lines _popup_menus server_var(_popup_popupname) "lines"
+  es_keygetvalue _popup_cache _popup_menus server_var(_popup_popupname) "line1"
+  es_xset _popup_loop_1 2
+  es_xdoblock popup/loop_recache_0
+}
+
+block loop_recache_0
+{
+  if (server_var(_popup_loop_1) <= server_var(_popup_lines)) do
+  {
+    es_xformatv _popup_loop_format line%1 _popup_loop_1
+    es_keygetvalue _popup_loop_temp _popup_menus server_var(_popup_popupname) server_var(_popup_loop_format)
+    es_xformatv _popup_cache %1\n%2 _popup_cache _popup_loop_temp
+    es_xmath _popup_loop_1 + 1
+    es_xdoblock popup/loop_recache_0
+  }
+}
+
+block util_recache_user0
+{
+  // Recache a popup type 0 with cachemode user
+  es_xdoblock popup/util_recache_0
+  es_xformatv _popup_format cache_%1 _popup_popupname
+  es_keysetvalue _popup_users server_var(_popup_userid) server_var(_popup_format) server_var(_popup_cache)
+}
+
+block loop_findqueueindex
+{
+  // block used to find the queue index number inside _popup_menus
+  // used by unsendname command when only one specific user was given
+  if (server_var(_popup_loop_1) <= server_var(_popup_loop_limit)) do
+  {
+    es_xformatv _popup_loop_format queue%1 _popup_loop_1
+    es_keygetvalue _popup_loop_temp _popup_menus server_var(_popup_arg_name) server_var(_popup_loop_format)
+    if (server_var(_popup_loop_temp) == server_var(_popup_keyname)) do
+    {
+      es_xformatv _popup_loop_format queue%1link _popup_loop_1
+      es_keygetvalue _popup_loop_temp _popup_menus server_var(_popup_arg_name) server_var(_popup_loop_format)
+      es_xcopy _popup_index _popup_loop_1
+      es_xmath _popup_loop_limit - 1
+      if (server_var(_popup_loop_temp) == server_var(_popup_que_start)) do
+      {
+        // player has this popup visible!
+        es_keygetvalue _popup_temp _popup_users server_var(_popup_keyname) "cachelast"
+        es_menu 1 server_var(_popup_keyname) server_var(_popup_temp)
+        es_keysetvalue _popup_users server_var(_popup_keyname) "closemode" server_var(_popup_closemode)
+        es_soon es_xcexec server_var(_popup_keyname) slot10
+      }
+      else do
+      {
+        // the popup was in queue somewhere
+        es_xformatv _popup_format queue%1 _popup_loop_temp
+        es_keysetvalue _popup_users server_var(_popup_keyname) server_var(_popup_format) "0"
+        es_xdoblock popup/pop_removefromqueue
+      }
+    }
+    else do
+    {
+      es_xmath _popup_loop_1 + 1
+    }
+    es_xdoblock popup/loop_findqueueindex
+  }
+}
+
+block loop_findqueueindexes
+{
+  // block used to find the queue index numbers inside _popup_menus
+  // used by unsendname command when multi-user was given
+  if (server_var(_popup_loop_1) <= server_var(_popup_loop_limit)) do
+  {
+    es_xformatv _popup_loop_format queue%1 _popup_loop_1
+    es_keygetvalue _popup_keyname _popup_menus server_var(_popup_arg_name) server_var(_popup_loop_format)
+    es_xdoblock popup/util_playerfilter
+    ifx true(filter_ok) do
+    {
+      es_keygetvalue _popup_que_start _popup_users server_var(_popup_keyname) "queuestart"
+      es_xformatv _popup_loop_format queue%1link _popup_loop_1
+      es_keygetvalue _popup_loop_temp _popup_menus server_var(_popup_arg_name) server_var(_popup_loop_format)
+      es_xcopy _popup_index _popup_loop_1
+      es_xmath _popup_loop_limit - 1
+      if (server_var(_popup_loop_temp) == server_var(_popup_que_start)) do
+      {
+        // player has this popup visible!
+        es_keygetvalue _popup_temp _popup_users server_var(_popup_keyname) "cachelast"
+        es_menu 1 server_var(_popup_keyname) server_var(_popup_temp)
+        es_keysetvalue _popup_users server_var(_popup_keyname) "closemode" server_var(_popup_closemode)
+        es_soon es_xsexec server_var(_popup_keyname) menuselect 10
+      }
+      else do
+      {
+        // the popup was in queue somewhere
+        es_xformatv _popup_format queue%1 _popup_loop_temp
+        es_keysetvalue _popup_users server_var(_popup_keyname) server_var(_popup_format) "0"
+        es_xdoblock popup/pop_removefromqueue
+      }
+    }
+    else do
+    {
+      es_xmath _popup_loop_1 + 1
+    }
+    es_xdoblock popup/loop_findqueueindexes
+  }
+}
+
+block loop_isqueued
+{
+  // A loop to find out the queue position of the popup
+  if (server_var(_popup_loop_1) <= server_var(_popup_loop_limit)) do
+  {
+    es_xformatv _popup_format queue%1 _popup_loop_1
+    es_keygetvalue _popup_popupname _popup_users server_var(_popup_arg_user) server_var(_popup_format)
+    if (server_var(_popup_popupname) == server_var(_popup_arg_name)) do
+    {
+      es_mathparse server_var(_popup_arg_var) "_popup_loop_1-_popup_que_start+1"
+      es_xset filter_ok 1
+    }
+    else do
+    {
+      es_xmath _popup_loop_1 + 1
+      es_xdoblock popup/loop_isqueued
+    }
+  }
+}
+
+block loop_recache
+{
+  // loops through players in a stack and recaches the popup for them
+  es_xmath _popup_loop_2 - 1
+  ifx true(_popup_loop_2) do
+  {
+    es stack pop _popup_userid server_var(_popup_stack)
+    es_doblock server_var(_popup_arg_block)
+    es_xdoblock popup/loop_recache
+  }
+}
+
+block loop_update
+{
+  // loops through players in a stack and updates the popup for them
+  es_xmath _popup_loop_1 - 1
+  ifx true(_popup_loop_1) do
+  {
+    es stack pop _popup_userid server_var(_popup_stack)
+    es_keygetvalue _popup_popupname _popup_users server_var(_popup_userid) "active"
+    if (server_var(_popup_arg_name) == server_var(_popup_popupname)) do
+    {
+      es_xdoblock popup/user_viewpopup
+    }
+    es_xdoblock popup/loop_update
+  }
+}
+
+block loop_emulate
+{
+  // loops through players in a stack and emulates the popup choice for them
+  es_xmath _popup_loop_1 - 1
+  ifx true(_popup_loop_1) do
+  {
+    es stack pop _popup_userid server_var(_popup_stack)
+    es_xdoblock popup/pop_select
+    es_xdoblock popup/loop_emulate
+  }
+}
+
+
+block pop_select
+{
+  es_xset _popup_force0 1
+  es_xcopy _popup_name _popup_popupname
+  es_keygetvalue _popup_type _popup_menus server_var(_popup_name) "type"
+  es_keygetvalue _popup_dispmode _popup_menus server_var(_popup_name) "displaymode"
+  es_xset _popup_action 0
+  ifx true(_popup_userid) do
+  {
+    es_keygetvalue _popup_que_start _popup_users server_var(_popup_userid) "queuestart"
+    es_keygetvalue _popup_que_end _popup_users server_var(_popup_userid) "queueend"
+    // Get the index for pop_removefromqueue
+    es_xformatv _popup_format queue%1link _popup_que_start
+    es_keygetvalue _popup_index _popup_users server_var(_popup_userid) server_var(_popup_format)
+    es_keygetvalue _popup_active _popup_users server_var(_popup_userid) "activelink"
+  }
+  ifx false(_popup_closemode) do
+  {
+    ifx false(_popup_type) do
+    {
+      // normal popup
+      es_xformatv _popup_format menuvar%1 _popup_choice
+      es_keygetvalue _popup_arg_var _popup_menus server_var(_popup_name) server_var(_popup_format)
+      ifx true(_popup_arg_var) do
+      {
+        es_xformatv _popup_format menuval%1 _popup_choice
+        es_keygetvalue server_var(_popup_arg_var) _popup_menus server_var(_popup_name) server_var(_popup_format)
+      }
+      es_xformatv _popup_format submenu%1 _popup_choice
+      es_keygetvalue _popup_block _popup_menus server_var(_popup_name) server_var(_popup_format)
+      ifx true(_popup_debug) do
+      {
+        es_dbgmsg 0 POPUP DEBUG: Submenu server_var(_popup_choice) is server_var(_popup_block)
+      }
+      ifx true(_popup_block) do
+      {
+        es_exists _popup_exists key _popup_menus server_var(_popup_block)
+        ifx false(_popup_exists) do
+        {
+          es_xset _popup_block "0"
+        }
+      }
+      ifx true(_popup_block) do
+      {
+        ifx true(_popup_userid) do
+        {
+          // Set the new popup name to the current queue position for the user
+          es_xformatv _popup_format queue%1 _popup_que_start
+          es_keysetvalue _popup_users server_var(_popup_userid) server_var(_popup_format) server_var(_popup_block)
+          // Get the queue length for the new popup and increase it by 1
+          es_keygetvalue _popup_que_length _popup_menus server_var(_popup_block) "queued"
+          es_xmath _popup_que_length + 1
+          es_keysetvalue _popup_menus server_var(_popup_block) "queued" server_var(_popup_que_length)
+          // Set the user queue link to the new queue position of the new popup
+          es_xformatv _popup_format queue%1link _popup_que_start
+          es_keysetvalue _popup_users server_var(_popup_userid) server_var(_popup_format) server_var(_popup_que_length)
+          // Set the popup queue values for new popup
+          es_xformatv _popup_format queue%1 _popup_que_length
+          es_keysetvalue _popup_menus server_var(_popup_block) server_var(_popup_format) server_var(_popup_userid)
+          es_xformatv _popup_format queue%1link _popup_que_length
+          es_keysetvalue _popup_menus server_var(_popup_block) server_var(_popup_format) server_var(_popup_que_start)
+        }
+        es_xset _popup_action 1
+      }
+      else do
+      {
+        es_xmath _popup_que_start + 1
+        if (server_var(_popup_dispmode) == "normal") do
+        {
+          ifx true(_popup_userid) do
+          {
+            ifx true(_popup_debug) do
+            {
+              es_xdbgmsg 0 POPUP DEBUG: Removing the popup from queue and active
+            }
+            es_keysetvalue _popup_users server_var(_popup_userid) "queuestart" server_var(_popup_que_start)
+            // Remove queue and active from old popup
+            es_xdoblock popup/pop_removefromqueue
+            es_xdoblock popup/pop_removefromactive
+          }
+        }
+      }
+      es_xformatv _popup_format select%1 _popup_choice
+      es_keygetvalue _popup_block _popup_menus server_var(_popup_name) server_var(_popup_format)
+      es_keygetvalue _popup_msblock _popup_menus server_var(_popup_name) "menuselect"
+      ifx true(_popup_debug) do
+      {
+        es_dbgmsg 0 POPUP DEBUG: Select server_var(_popup_choice) of normal menu server_var(_popup_name) is server_var(_popup_block)
+      }
+      ifx true(_popup_block) do
+      {
+        es_doblock server_var(_popup_block)
+        es_xset _popup_action 1
+      }
+      else do
+      {
+        es_keygetvalue _popup_block _popup_menus server_var(_popup_name) "menuselectfb"
+        ifx true(_popup_debug) do
+        {
+          es_dbgmsg 0 POPUP DEBUG: No select, menuselectfb is server_var(_popup_block)
+        }
+        ifx true(_popup_block) do
+        {
+          es_doblock server_var(_popup_block)
+          es_xset _popup_action 1
+        }
+      }
+      ifx true(_popup_debug) do
+      {
+        es_dbgmsg 0 POPUP DEBUG: Menuselect is server_var(_popup_msblock)
+      }
+      ifx true(_popup_msblock) do
+      {
+        es_doblock server_var(_popup_msblock)
+        es_xset _popup_action 1
+      }
+      if (server_var(_popup_dispmode) == "sticky") do
+      {
+        ifx true(_popup_debug) do
+        {
+          es_xdbgmsg 0 POPUP DEBUG: Sticky popup detected!
+        }
+        ifx false(_popup_action) do
+        {
+          ifx true(_popup_debug) do
+          {
+            es_xdbgmsg 0 POPUP DEBUG: Trying to issue slot command on client!
+          }
+          // an attempt to let the user switch weapons with sticky popups, does *not* need cl_rsc 0 !
+          es_xformatv _popup_format slot%1 _popup_choice
+          es_cexec server_var(_popup_userid) server_var(_popup_format)
+          es_keygetvalue _popup_cache _popup_users server_var(_popup_userid) "cachelast"
+          es_delayed .2 es_xmenu 0 server_var(_popup_userid) server_var(_popup_cache)
+          es_keysetvalue _popup_users server_var(_popup_userid) "active" server_var(_popup_name)
+          es_keysetvalue _popup_users server_var(_popup_userid) "closemode" "1"
+          es_delayed .2 es_xkeysetvalue _popup_users server_var(_popup_userid) "closemode" "0"
+          // to prevent other popup handling get in way:
+          es_xset _popup_userid 0
+        }
+        else do
+        {
+          ifx true(_popup_userid) do
+          {
+            ifx true(_popup_debug) do
+            {
+              es_xdbgmsg 0 POPUP DEBUG: Removing the sticky popup from queue and active
+            }
+            es_keysetvalue _popup_users server_var(_popup_userid) "queuestart" server_var(_popup_que_start)
+            // Remove queue and active from old popup
+            es_xdoblock popup/pop_removefromqueue
+            es_xdoblock popup/pop_removefromactive
+          }
+        }
+      }
+    }
+  }
+  else do
+  {
+    es_xmath _popup_que_start + 1
+    es_keysetvalue _popup_users server_var(_popup_userid) "queuestart" server_var(_popup_que_start)
+    // Remove queue and active from old popup
+    es_xdoblock popup/pop_removefromqueue
+    es_xdoblock popup/pop_removefromactive
+  }
+  ifx true(_popup_userid) do
+  {
+    es_xdoblock popup/user_checkqueue
+  }
+  es_xset _popup_force0 0
+}

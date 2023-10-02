@@ -1,0 +1,654 @@
+// foreach command v0.6.5
+// Submitted by [NATO]Hunter
+//
+// foreach loops are supported through corelib
+// syntax:
+// foreach player <var> <identifier> "<command>"
+// foreach entity <keyvar> <classvar> <part-of-entity-name> "<command>"
+// foreach weapon <var> <identifier> "<command>"
+// foreach token <var> "<string>" "<separator>" "<command>"
+// foreach part <var> "<string>" "<character-count>" "<command>"
+// Originally submitted by [NATO]Hunter
+
+block load
+{
+  es_xdoblock corelib/foreach/foreach_register
+}
+
+block foreach_register
+{
+  // variables used by foreach
+  es_xset _foreachblock 0
+  es_xset _foreachplayer 0
+  es_xset _foreachkeycount 0
+  es_xset _foreachkeyname 0
+  es_xset _foreachcommand 0
+  es_xset _foreachvar 0
+  es_xset _foreachclassvar 0
+  es_xset _foreachtarget 0
+  es_xset _foreachseparator 0
+  es_xset _foreachindex 0
+  es_xset _foreachendex 0
+  es_xset _foreachstring 0
+  es_xset _foreachchars 0
+  es_xset _foreachcmd 0
+  es_xset _foreachweaponins 0
+  es_xset _foreachweapontag 0
+  es_xset _foreachweaponkey 0
+  es_xset _foreachweaponkeyname 0
+  es_xset _foreachweapontoken 0
+  es_xset _foreachgame 0
+  es_xset _foreachdoit 0
+  es_xset _foreachexists 0
+  es_xgetgame _foreachgame
+  stack create _foreach_player_stack
+  stack create _foreach_entity_stack
+  stack create _foreach_weapon_stack
+  stack create _foreach_token_stack
+  stack create _foreach_part_stack
+  es_xdoblock corelib/foreach/foreach_keygroupload
+  es_xexists _exists command foreach
+  if (server_var(_exists) = 0) do
+  {
+    es_xregcmd foreach corelib/foreach/foreach "Allows you to loop a command over different things. Currently supports 'foreach player', 'foreach token' and 'foreach part'"
+  }
+  
+  testcase qcreate corelib foreachtest "Tests foreach"
+  testcase addtest foreachtest foreachtest1 corelib/foreach/foreach_test "Tests foreach loops without players"
+}
+
+block unload
+{
+  es_keygroupdelete server_var(_foreachweaponkeyname)
+  stack delete _foreach_player_stack
+  stack delete _foreach_entity_stack
+  stack delete _foreach_weapon_stack
+  stack delete _foreach_token_stack
+  stack delete _foreach_part_stack
+}
+
+block foreach_keygroupload
+{
+  es_xset _foreachweaponkeyname 0
+  es_xset _foreachweaponkeyloaded 0
+  if ("Counter-Strike" in server_var(_foreachgame)) do
+  {
+    es_xset _foreachweaponkeyname "_foreach_weaponlist_cstrike"
+  }
+  if ("Day of Defeat" in server_var(_foreachgame)) do
+  {
+    es_xset _foreachweaponkeyname "_foreach_weaponlist_dods"
+  }
+  if ("Deathmatch" in server_var(_foreachgame)) do
+  {
+    es_xset _foreachweaponkeyname "_foreach_weaponlist_hl2dm"
+  }
+  ifx true(_foreachweaponkeyname) do
+  {
+    es_xset _foreachweaponkeyloaded 1
+    es_keygroupload server_var(_foreachweaponkeyname) |corelib/foreach
+  }
+}
+
+block foreach
+{
+  es_xgetargv _foreachcmd 1
+  es_xformatv _foreachblock "corelib/foreach/foreach_cmd_%1" _foreachcmd
+  es_exists _foreachexists block server_var(_foreachblock)
+  ifx true(_foreachexists) do
+  {
+    es_doblock server_var(_foreachblock)
+  }
+  else do
+  {
+    es_xdbgmsg 0 foreach: Invalid subcommand for foreach
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Sub commmand part:
+// ------------------
+//
+
+block foreach_cmd_player
+{
+  // sub command "player"
+  stack save _foreach_player_stack _foreachcommand
+  stack save _foreach_player_stack _foreachvar
+  stack save _foreach_player_stack _foreachtarget
+  stack save _foreach_player_stack _foreachkeyname
+  es_xgetargv _foreachvar 2
+  ifx true(_foreachvar) do
+  {
+    es_xgetargv _foreachtarget 3
+    // check for group/sort/team identifier
+    if ("#" in server_var(_foreachtarget)) do
+    {
+      es_xgetargv _foreachcommand 4
+      ifx true(_foreachcommand) do
+      {
+        // we need to preserve the stack so foreach can be called from within itself.
+        es_xmath _foreachkeycount + 1
+        es_xformatv _foreachkeyname "_foreach_playerlist%1" _foreachkeycount
+        // create the keygroup with the player information
+        es_createplayerlist server_var(_foreachkeyname)
+        // check for things like #human#bot and remove them
+        if ("#human" in server_var(_foreachtarget)) do
+        {
+          if ("#bot" in server_var(_foreachtarget)) do
+          {
+            es_xstring _foreachtarget replace "#human"
+            es_xstring _foreachtarget replace "#bot"
+          }
+        }
+        if ("#alive" in server_var(_foreachtarget)) do
+        {
+          if ("#dead" in server_var(_foreachtarget)) do
+          {
+            es_xstring _foreachtarget replace "#alive"
+            es_xstring _foreachtarget replace "#dead"
+          }
+        }
+        // filter the keygroup by identifiers
+        ifx true(_foreachtarget) do
+        {
+          if ("#all" in server_var(_foreachtarget)) do
+          {
+            es_xstring _foreachtarget replace "#all"
+            ifx true(_foreachtarget) do
+            {
+              es_xdoblock corelib/foreach/foreach_player_filter
+            }
+          }
+          else do
+          {
+            es_xdoblock corelib/foreach/foreach_player_filter     
+          }
+        }
+        es_foreachkey _foreachplayer in server_var(_foreachkeyname) "es_xdoblock corelib/foreach/foreach_player_cmd"
+        es_keygroupdelete server_var(_foreachkeyname)
+      }
+      else do
+      {
+        es_xdbgmsg 0 foreach player: Invalid arguments for foreach player. Syntax: foreach player <var> <identifier> "<command>"
+      }
+    }
+    else do
+    {
+      // check for single player
+      // expand a single player
+      es_getuserid _foreachplayer server_var(_foreachtarget)
+      // check for a valid user
+      ifx true(_foreachplayer) do
+      {
+        es_xgetargv _foreachcommand 4
+        // command block
+        es_xdoblock corelib/foreach/foreach_player_cmd
+      }
+      else do
+      {
+        es_dbgmsg 0 foreach player: The player or identifier server_var(_foreachplayer) does not exists
+        es_xdbgmsg 0 foreach player: Invalid player or identifier for foreach player. Syntax: foreach player <var> <identifier> "<command>"
+        es_xdbgmsg 0 foreach player: Identifiers: userid, steamid, playername, #all, #spec, #un, #t, #ct, #human, #bot, #alive, #dead
+      }
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 foreach player: Invalid arguments for foreach player. Syntax: foreach player <var> <identifier> "<command>"
+  }
+  stack restore _foreach_player_stack _foreachkeyname
+  stack restore _foreach_player_stack _foreachtarget
+  stack restore _foreach_player_stack _foreachvar
+  stack restore _foreach_player_stack _foreachcommand
+  // end of sub command "player"
+}
+
+block foreach_cmd_entity
+{
+  // sub command "entity"
+  stack save _foreach_entity_stack _foreachcommand
+  stack save _foreach_entity_stack _foreachvar
+  stack save _foreach_entity_stack _foreachclassvar
+  stack save _foreach_entity_stack _foreachtarget
+  stack save _foreach_entity_stack _foreachkeyname
+  es_xgetargv _foreachvar 2
+  ifx true(_foreachvar) do
+  {
+    es_xgetargv _foreachclassvar 3
+    ifx true(_foreachclassvar) do
+    {
+      es_xgetargv _foreachtarget 4
+      es_xgetargv _foreachcommand 5
+      ifx true(_foreachcommand) do
+      {
+        es_set server_var(_foreachclassvar) 0
+        // we need to preserve the stack so foreach can be called from within itself
+        es_xmath _foreachkeycount + 1
+        es_xformatv _foreachkeyname "_foreach_entitylist%1" _foreachkeycount
+        // create the keygroup with the entity information
+        es_createentitylist server_var(_foreachkeyname)
+        ifx true(_foreachtarget) do
+        {
+          es_keygroupfilter server_var(_foreachkeyname) only classname server_var(_foreachtarget)
+        }
+        es_foreachkey _foreachentity in server_var(_foreachkeyname) "es_xdoblock corelib/foreach/foreach_entity_cmd"
+        es_keygroupdelete server_var(_foreachkeyname)
+      }
+      else do
+      {
+        es_xdbgmsg 0 foreach entity: Invalid arguments for foreach entity. Syntax: foreach entity <keyvar> <classvar> <part-of-entity-name> "<command>"
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 foreach entity: Invalid arguments for foreach entity. Syntax: foreach entity <keyvar> <classvar> <part-of-entity-name> "<command>"
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 foreach entity: Invalid arguments for foreach entity. Syntax: foreach entity <keyvar> <classvar> <part-of-entity-name> "<command>"
+  }
+  stack restore _foreach_entity_stack _foreachkeyname
+  stack restore _foreach_entity_stack _foreachtarget
+  stack restore _foreach_entity_stack _foreachclassvar
+  stack restore _foreach_entity_stack _foreachvar
+  stack restore _foreach_entity_stack _foreachcommand
+  // end of sub command "entity"
+}
+
+block foreach_cmd_weapon
+{
+  // sub command "weapon"
+  ifx true(_foreachweaponkeyloaded) do
+  {
+    stack save _foreach_weapon_stack _foreachtarget
+    stack save _foreach_weapon_stack _foreachcommand
+    stack save _foreach_weapon_stack _foreachvar
+    stack save _foreach_weapon_stack _foreachkeyname
+    // check arguments
+    es_xgetargv _foreachvar 2
+    ifx true(_foreachvar) do
+    {
+      es_xgetargv _foreachtarget 3
+      ifx true(_foreachtarget) do
+      {
+        es_xgetargv _foreachcommand 4
+        ifx true(_foreachcommand) do
+        {
+          // we need to preserve the stack so foreach can be called from within itself
+          es_xmath _foreachkeycount + 1
+          es_xformatv _foreachkeyname "_foreach_weaponlist%1" _foreachkeycount
+          // create the keygroup for the weapon information
+          es_keygroupcreate server_var(_foreachkeyname)
+          es foreach token _foreachweapontoken server_var(_foreachtarget) "#" "es_xdoblock corelib/foreach/foreach_weapon_tags"
+          es_foreachkey _foreachweaponkey in server_var(_foreachkeyname) "es_xdoblock corelib/foreach/foreach_weapon_cmd"
+          es_keygroupdelete server_var(_foreachkeyname)
+        }
+        else do
+        {
+          es_xdbgmsg 0 foreach weapon: Invalid arguments for foreach weapon. Syntax: foreach weapon <var> <identifier> "<command>"
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 foreach weapon: Invalid arguments for foreach weapon. Syntax: foreach weapon <var> <identifier> "<command>"
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 foreach weapon: Invalid arguments for foreach weapon. Syntax: foreach weapon <var> <identifier> "<command>"
+    }
+    stack restore _foreach_weapon_stack _foreachkeyname
+    stack restore _foreach_weapon_stack _foreachvar
+    stack restore _foreach_weapon_stack _foreachcommand
+    stack restore _foreach_weapon_stack _foreachtarget
+  }
+  else do
+  {
+    es_xdbgmsg 0 foreach weapon: Sorry, but this game is not supported!
+  }
+  // end of sub command "weapon"
+}
+
+block foreach_cmd_token
+{
+  // sub command "token"
+  stack save _foreach_token_stack _foreachtarget
+  stack save _foreach_token_stack _foreachcommand
+  stack save _foreach_token_stack _foreachseparator
+  stack save _foreach_token_stack _foreachstring
+  stack save _foreach_token_stack _foreachvar
+  stack save _foreach_token_stack _foreachindex
+  stack save _foreach_token_stack _foreachendex
+  // check arguments
+  es_xgetargv _foreachvar 2
+  ifx true(_foreachvar) do
+  {
+    es_xgetargv _foreachstring 3
+    ifx true(_foreachstring) do
+    {
+      es_xgetargv _foreachseparator 4
+      ifx true(_foreachseparator) do
+      {
+        es_xgetargv _foreachcommand 5
+        ifx true(_foreachcommand) do
+        {
+          // loop through the string
+          es_xdoblock corelib/foreach/foreach_token_loop
+        }
+        else do
+        {
+          es_xdbgmsg 0 foreach: Invalid arguments for foreach token. Syntax: foreach token <var> "<string>" "<separator>" "<command>"
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 foreach: Invalid arguments for foreach token. Syntax: foreach token <var> "<string>" "<separator>" "<command>"
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 foreach: Invalid arguments for foreach token. Syntax: foreach token <var> "<string>" "<separator>" "<command>"
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 foreach: Invalid arguments for foreach token. Syntax: foreach token <var> "<string>" "<separator>" "<command>"
+  }
+  stack restore _foreach_token_stack _foreachendex
+  stack restore _foreach_token_stack _foreachindex
+  stack restore _foreach_token_stack _foreachvar
+  stack restore _foreach_token_stack _foreachstring
+  stack restore _foreach_token_stack _foreachseparator
+  stack restore _foreach_token_stack _foreachcommand
+  stack restore _foreach_token_stack _foreachtarget
+  // end of sub command "token"
+}
+
+block foreach_cmd_part
+{
+  // sub command "part"
+  stack save _foreach_part_stack _foreachindex
+  stack save _foreach_part_stack _foreachendex
+  stack save _foreach_part_stack _foreachseparator
+  stack save _foreach_part_stack _foreachtarget
+  stack save _foreach_part_stack _foreachcommand
+  stack save _foreach_part_stack _foreachchars
+  stack save _foreach_part_stack _foreachstring
+  stack save _foreach_part_stack _foreachvar
+  // check arguments
+  es_xgetargv _foreachvar 2
+  ifx true(_foreachvar) do
+  {
+    es_xgetargv _foreachstring 3
+    ifx true(_foreachstring) do
+    {
+      es_xgetargv _foreachchars 4
+      if (server_var(_foreachchars) > "0") do
+      {
+        es_xgetargv _foreachcommand 5
+        ifx true(_foreachcommand) do
+        {
+          // loop through the string
+          es_xset _foreachindex 0
+          es_xcopy _foreachendex _foreachchars
+          es_xdoblock corelib/foreach/foreach_part_loop
+        }
+        else do
+        {
+          es_xdbgmsg 0 foreach: Invalid arguments for foreach part. Syntax: foreach part <var> "<string>" "<character count>" "<command>"
+        }
+      }
+      else do
+      {
+        es_xdbgmsg 0 foreach: Invalid arguments for foreach part. Syntax: foreach part <var> "<string>" "<character count>" "<command>"
+      }
+    }
+    else do
+    {
+      es_xdbgmsg 0 foreach: Invalid arguments for foreach part. Syntax: foreach part <var> "<string>" "<character count>" "<command>"
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 foreach: Invalid arguments for foreach part. Syntax: foreach part <var> "<string>" "<character count>" "<command>"
+  }
+  stack restore _foreach_part_stack _foreachvar
+  stack restore _foreach_part_stack _foreachstring
+  stack restore _foreach_part_stack _foreachchars
+  stack restore _foreach_part_stack _foreachcommand
+  stack restore _foreach_part_stack _foreachtarget
+  stack restore _foreach_part_stack _foreachseparator
+  stack restore _foreach_part_stack _foreachendex
+  stack restore _foreach_part_stack _foreachindex
+  // end of sub command "part"
+}
+
+// -----------------------------------------------------------------------------
+// Internal block part:
+// --------------------
+//
+
+// filters the foreach player keygroup
+block foreach_player_filter
+{
+  if ("#alive" in server_var(_foreachtarget)) do
+  {
+    es_keygroupfilter server_var(_foreachkeyname) only isdead "0"
+  }
+  if ("#dead" in server_var(_foreachtarget)) do
+  {
+    es_keygroupfilter server_var(_foreachkeyname) only isdead "1"
+  }
+  if ("#human" in server_var(_foreachtarget)) do
+  {
+    es_keygroupfilter server_var(_foreachkeyname) only isbot "0"
+  }
+  if ("#bot" in server_var(_foreachtarget)) do
+  {
+    es_keygroupfilter server_var(_foreachkeyname) only isbot "1"
+  }
+  es_xset _foreachdoit 1
+  if ("#spec" notin server_var(_foreachtarget)) do
+  {
+    if ("#un" notin server_var(_foreachtarget)) do
+    {
+      if ("#t" notin server_var(_foreachtarget)) do
+      {
+        if ("#ct" notin server_var(_foreachtarget)) do
+        {
+          es_xset _foreachdoit 0
+        }
+      }
+    }
+  }
+  ifx true(_foreachdoit) do
+  {
+    if ("#spec" notin server_var(_foreachtarget)) do
+    {
+      es_keygroupfilter server_var(_foreachkeyname) not teamid "0"
+    }
+    if ("#un" notin server_var(_foreachtarget)) do
+    {
+      es_keygroupfilter server_var(_foreachkeyname) not teamid "1"
+    }
+    if ("#t" notin server_var(_foreachtarget)) do
+    {
+      es_keygroupfilter server_var(_foreachkeyname) not teamid "2"
+    }
+    if ("#ct" notin server_var(_foreachtarget)) do
+    {
+      es_keygroupfilter server_var(_foreachkeyname) not teamid "3"
+    }
+  }
+}
+
+// performe the command on a group/team/sort of players
+block foreach_player_cmd
+{
+  // set up the var and run the command
+  es_set server_var(_foreachvar) server_var(_foreachplayer)
+  es_xcommandv _foreachcommand
+}
+
+// performe the command on the entities
+block foreach_entity_cmd
+{
+  // set up the var and run the command
+  es_keygetvalue server_var(_foreachclassvar) server_var(_foreachkeyname) server_var(_foreachentity) classname
+  es_set server_var(_foreachvar) server_var(_foreachentity)
+  es_xcommandv _foreachcommand
+}
+
+// copy the targetted weapons into the new loop keygroup
+block foreach_weapon_prep
+{
+  es_keygetvalue _foreachweapontag server_var(_foreachweaponkeyname) server_var(_foreachweaponkey) tags
+  if (server_var(_foreachweapontoken) in server_var(_foreachweapontag)) do
+  {
+    es_keycreate server_var(_foreachkeyname) server_var(_foreachweaponkey)
+  }
+}
+
+// check for the tag
+block foreach_weapon_tags
+{
+  es_xformatv _foreachweapontoken "#%1" _foreachweapontoken
+  es_foreachkey _foreachweaponkey in server_var(_foreachweaponkeyname) "es_xdoblock corelib/foreach/foreach_weapon_prep"
+}
+
+// performe the command on the weapons
+block foreach_weapon_cmd
+{
+  // set up the var and run the command
+  es_set server_var(_foreachvar) server_var(_foreachweaponkey)
+  es_xcommandv _foreachcommand
+}
+
+// set up the token parts
+block foreach_token_cmd
+{
+  es_token _foreachtarget server_var(_foreachstring) 1 server_var(_foreachseparator)
+  ifx true(_foreachtarget) do
+  {
+    es_strlen _foreachindex server_var(_foreachtarget)
+    es_strlen _foreachendex server_var(_foreachstring)
+    es_xmath _foreachindex + 1
+    es_string _foreachstring section server_var(_foreachindex) server_var(_foreachendex)
+    es_set server_var(_foreachvar) server_var(_foreachtarget)
+    es_xcommandv _foreachcommand
+    es_xdoblock corelib/foreach/foreach_token_loop
+  }
+}
+
+// call the cmd part
+block foreach_token_loop
+{
+  es_xdoblock corelib/foreach/foreach_token_cmd
+}
+
+// set up the part parts
+block foreach_part_cmd
+{
+  es_math _foreachindex + server_var(_foreachchars)
+  es_math _foreachendex + server_var(_foreachchars)
+  es_set server_var(_foreachvar) server_var(_foreachtarget)
+  es_xcommandv _foreachcommand
+  es_xdoblock corelib/foreach/foreach_part_loop
+}
+
+// get the next part
+block foreach_part_loop
+{
+  es_xcopy _foreachtarget _foreachstring
+  es_string _foreachtarget section server_var(_foreachindex) server_var(_foreachendex)
+  es_strlen _foreachseparator server_var(_foreachtarget)
+  if (server_var(_foreachseparator) < server_var(_foreachchars)) do
+  {
+    es_xcopy _foreachendex _foreachindex
+    es_math _foreachendex + server_var(_foreachseparator)
+    es_xcopy _foreachtarget _foreachstring
+    es_string _foreachtarget section server_var(_foreachindex) server_var(_foreachendex)
+  }
+  ifx true(_foreachtarget) do
+  {
+    es_xdoblock corelib/foreach/foreach_part_cmd
+  }
+}
+
+// Test cases
+block foreach_test
+{
+  es_xset myvar 0
+  es_xset myresult 0
+  es_xset mynested 0
+
+  testlib begin token1 "Testing whether or not token works 1"
+  es_xset myvar 0
+  foreach token myresult "a-s-d-f-g-h-j-k-l-k-j-h-g-f-d-s-a" "-" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 17
+  testlib end
+
+  testlib begin token2 "Testing whether or not token works 2"
+  es_xset myvar 0
+  foreach token myresult "agfh#fsdf#hjlasd#jhlzuisd#sdarwat#hgkzti" "#" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 6
+  testlib end
+
+  testlib begin token3 "Testing whether or not token works 3"
+  es_xset myvar 0
+  foreach token myresult "1-2-3-4-5-6-7-8-9-10" "-" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 10
+  testlib end
+
+  testlib begin token4 "Testing whether or not token works 4"
+  es_xset myvar 0
+  foreach token myresult "1-2#3-4#5-6#7-8#9-10" "-" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 6
+  testlib end
+
+  testlib begin part1 "Testing whether or not part works 1"
+  es_xset myvar 0
+  foreach part myresult "a-b-c-d-e-f-g-h-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z" "1" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 49
+  testlib end
+
+  testlib begin part2 "Testing whether or not part works 2"
+  es_xset myvar 0
+  foreach part myresult "a-b-c-d-e-f-g-h-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z" "2" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 25
+  testlib end
+
+  testlib begin part3 "Testing whether or not part works 3"
+  es_xset myvar 0
+  foreach part myresult "a-b-c-d-e-f-g-h-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z" "3" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 17
+  testlib end
+
+  testlib begin part4 "Testing whether or not part works 4"
+  es_xset myvar 0
+  foreach part myresult "a-b-c-d-e-f-g-h-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z" "4" "es_xmath myvar + 1"
+  testlib fail_unless myvar equalto 13
+  testlib end
+
+  testlib begin nesting1 "Testing whether or not nested loops work 1"
+  es_xset myvar 0
+  foreach token myresult "1-2#3-4#5-6#7-8#9-10" "#" "es_xdoblock corelib/foreach/test_nesting1"
+  testlib fail_unless myvar equalto 10
+  testlib end
+
+  testlib begin nesting2 "Testing whether or not nested loops work 2"
+  es_xset myvar 0
+  foreach part myresult "a-b-c-d-e-f-g-h-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z" "4" "es_xdoblock corelib/foreach/test_nesting2"
+  testlib fail_unless myvar equalto 25
+  testlib end
+}
+block test_nesting1
+{
+  es foreach token mynested server_var(myresult) "-" "es_xmath myvar + 1"
+}
+block test_nesting2
+{
+  es foreach part mynested server_var(myresult) "2" "es_xmath myvar + 1"
+}

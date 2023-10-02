@@ -1,0 +1,149 @@
+block load
+{
+  es_xdoblock corelib/keyfilter/keyfilter_register
+}
+
+// keyfilter <keygroup> <key> <not/only> <part-of-value-name> [value]
+
+block keyfilter_register
+{
+  // variables that keyfilter uses
+  es_xset _keyfilter_argc 0
+  es_xset _keyfilter_arg1 0
+  es_xset _keyfilter_arg2 0
+  es_xset _keyfilter_arg3 0
+  es_xset _keyfilter_arg4 0
+  es_xset _keyfilter_arg5 0
+  es_xset _keyfilter_loop 0
+  es_xset _keyfilter_loopval 0
+  // check to see if keyfilter exists
+  es_xexists _exists command keyfilter
+  ifx false(_exists) do
+  {
+    es_xregcmd keyfilter corelib/keyfilter/keyfilter
+  }
+}
+
+block keyfilter
+{
+  es_xgetargc _keyfilter_argc
+  if (server_var(_keyfilter_argc) > 4) do
+  {
+    es_xgetargv _keyfilter_arg1 1
+    es_exists _tempcore keygroup server_var(_keyfilter_arg1)
+    ifx true(_tempcore) do
+    {
+      es_xgetargv _keyfilter_arg2 2
+      es_exists _tempcore key server_var(_keyfilter_arg1) server_var(_keyfilter_arg2)
+      ifx true(_tempcore) do
+      {
+        es_xgetargv _keyfilter_arg3 3
+        es_xgetargv _keyfilter_arg4 4
+        es_xdoblock corelib/keyfilter/filter
+      }
+      else do
+      {
+        es_dbgmsg 0 keyfilter: Invalid key provided for keygroup server_var(_keyfilter_arg1): server_var(_keyfilter_arg2)
+      }
+    }
+    else do
+    {
+      es_dbgmsg 0 keyfilter: Invalid keygroup provided: server_var(_keyfilter_arg1)
+    }
+  }
+  else do
+  {
+    es_xdbgmsg 0 keyfilter: Not enough arguments. Syntax: keyfilter <keygroup> <key> <not/only> <part-of-value-name> [value]
+  }
+}
+
+block filter
+{
+  es_xgetargc _keyfilter_argc
+  es_xgetargv _keyfilter_arg4 4
+  es_xgetargv _keyfilter_arg5 5
+  es_xkeygroupcreate _keyfilter_tempgroup
+  es_xkeycreate _keyfilter_tempgroup _keyfilter_tempkey
+  if (server_var(_keyfilter_arg3) = not) do
+  {
+    es_foreachval _keyfilter_loop in server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) "es_xdoblock corelib/keyfilter/copy_not"
+    es_keydelete server_var(_keyfilter_arg1) server_var(_keyfilter_arg2)
+    es_keycreate server_var(_keyfilter_arg1) server_var(_keyfilter_arg2)
+    es_foreachval _keyfilter_loop in _keyfilter_tempgroup _keyfilter_tempkey "es_xdoblock corelib/keyfilter/paste"
+  }
+  else do
+  {
+    if (server_var(_keyfilter_arg3) = only) do
+    {
+      es_foreachval _keyfilter_loop in server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) "es_xdoblock corelib/keyfilter/copy_only"
+      es_keydelete server_var(_keyfilter_arg1) server_var(_keyfilter_arg2)
+      es_keycreate server_var(_keyfilter_arg1) server_var(_keyfilter_arg2)
+      es_foreachval _keyfilter_loop in _keyfilter_tempgroup _keyfilter_tempkey "es_xdoblock corelib/keyfilter/paste"
+    }
+    else do
+    {
+      es_dbgmsg 0 keyfilter: Invalid action provided. Syntax: keyfilter <keygroup> <key> <not/only> <part-of-value-name> [value]
+    }
+  }
+  es_xkeygroupdelete _keyfilter_tempgroup
+}
+
+block copy_not
+{
+  if (server_var(_keyfilter_argc) >= 6) do
+  {
+    es_keygetvalue _keyfilter_loopval server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) server_var(_keyfilter_loop)
+    if (server_var(_keyfilter_arg4) notin server_var(_keyfilter_loop)) do
+    {
+      es_keysetvalue _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+    }
+    else do
+    {
+      if (server_var(_keyfilter_arg5) != server_var(_keyfilter_loopval)) do
+      {
+        es_keysetvalue _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+      }
+    }
+  }
+  else do
+  {
+    es_keygetvalue _keyfilter_loopval server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) server_var(_keyfilter_loop)
+    if (server_var(_keyfilter_arg4) notin server_var(_keyfilter_loop)) do
+    {
+      es_keysetvalue _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+    }
+  }
+}
+
+block copy_only
+{
+  if (server_var(_keyfilter_argc) >= 6) do
+  {
+    es_keygetvalue _keyfilter_loopval server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) server_var(_keyfilter_loop)
+    if (server_var(_keyfilter_arg4) in server_var(_keyfilter_loop)) do
+    {
+      es_keysetvalue _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+    }
+    else do
+    {
+      if (server_var(_keyfilter_arg5) != server_var(_keyfilter_loopval)) do
+      {
+        es_keysetvalue _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+      }
+    }
+  }
+  else do
+  {
+    es_keygetvalue _keyfilter_loopval server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) server_var(_keyfilter_loop)
+    if (server_var(_keyfilter_arg4) in server_var(_keyfilter_loop)) do
+    {
+      es_keysetvalue _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+    }
+  }
+}
+
+block paste
+{
+  es_keygetvalue _keyfilter_loopval _keyfilter_tempgroup _keyfilter_tempkey server_var(_keyfilter_loop)
+  es_keysetvalue server_var(_keyfilter_arg1) server_var(_keyfilter_arg2) server_var(_keyfilter_loop) server_var(_keyfilter_loopval)
+}

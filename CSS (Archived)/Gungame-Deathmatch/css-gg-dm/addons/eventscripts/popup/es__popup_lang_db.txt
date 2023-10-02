@@ -1,0 +1,10 @@
+"_popup_lang"
+{
+	"en"
+	{
+		"prev"		"Previous"
+		"next"		"Next"
+		"exit"		"Close"
+		"pending"		"Pending"
+	}
+}

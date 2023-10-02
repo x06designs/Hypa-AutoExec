@@ -1,0 +1,10 @@
+"_popup_games"
+{
+	"cstrike"
+	{
+		"0"		"UN"
+		"1"		"SPEC"
+		"2"		"T"
+		"3"		"CT"
+	}
+}
